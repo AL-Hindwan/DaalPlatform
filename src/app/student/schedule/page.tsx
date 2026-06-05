@@ -1,10 +1,10 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Calendar as CalendarIcon, Video, AlertTriangle, Loader2, ChevronDown } from "lucide-react"
+import { Calendar as CalendarIcon, Video, AlertTriangle, Loader2, ChevronDown, MapPin } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
 import { toast } from "sonner"
 import { studentService } from "@/lib/student-service"
@@ -214,13 +214,13 @@ export default function StudentSchedulePage() {
 
                           <div className="order-1 flex-1 text-right md:order-2">
                             <div className="mb-1.5 flex items-center justify-start gap-2">
-                              <h4 className="text-base font-extrabold text-slate-900">جلسة أونلاين</h4>
+                              <h4 className="text-base font-extrabold text-slate-900">{session.topic || session.title || "جلسة تدريبية"}</h4>
                               <Badge className={`${statusCfg.className} rounded-full px-2 py-0.5 text-[11px]`}>{statusCfg.label}</Badge>
                             </div>
                             <p className="text-sm font-semibold text-slate-700">{session.courseTitle || "-"}</p>
                             <div className="mt-1.5 flex items-center justify-start gap-1 text-sm text-slate-500">
-                              <Video className="h-4 w-4" />
-                              <span>teams</span>
+                              {session.type === "online" ? <Video className="h-4 w-4" /> : <MapPin className="h-4 w-4" />}
+                              <span>{session.location || (session.type === "online" ? "أونلاين" : "حضوري")}</span>
                             </div>
                           </div>
 

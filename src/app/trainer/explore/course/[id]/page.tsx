@@ -875,7 +875,7 @@ export default function TrainerExploreCourseDetailsPage() {
                     <tbody className="divide-y divide-slate-200 bg-white text-slate-700">
                       {view.sessions.map((session, index) => (
                         <tr key={session.id}>
-                          <td className="px-4 py-3 font-medium text-slate-900">الجلسة {index + 1}</td>
+                          <td className="px-4 py-3 font-medium text-slate-900">{cleanText(session.topic) || `جلسة ${index + 1}`}</td>
                           <td className="px-4 py-3">{formatArabicDate(session.startTime)}</td>
                           <td className="px-4 py-3">من {formatArabicTime(session.startTime)} إلى {formatArabicTime(session.endTime)}</td>
                           <td className="px-4 py-3">{deliveryLabel(session.type)}</td>

@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { Suspense, useEffect, useState, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -93,7 +93,15 @@ function CreateCoursePageInner() {
     })
 
     // Schedule State
-    const [selectedSessions, setSelectedSessions] = useState<{ date: string, slot: string }[]>([])
+    type InPersonSession = { date: string; slot: string; topic: string }
+    const [selectedSessions, setSelectedSessions] = useState<InPersonSession[]>([])
+
+    // Session Labeling State
+    type LabelingMode = 'individual' | 'grouped'
+    type LabelingRule = { id: number; from: number; to: number; label: string }
+    const [labelingMode, setLabelingMode] = useState<LabelingMode>('individual')
+    const [labelingRules, setLabelingRules] = useState<LabelingRule[]>([])
+    const [ruleCounter, setRuleCounter] = useState(0)
     const [selectedDate, setSelectedDate] = useState<string | null>(null)
     const [calendarOffset, setCalendarOffset] = useState(0)
     const [unavailableMessage, setUnavailableMessage] = useState("")
@@ -253,6 +261,11 @@ function CreateCoursePageInner() {
                             }
                         })
                         if (loadedOnline.length > 0) setOnlineSessions(loadedOnline)
+                    } else if (existing.deliveryType === "in_person" && existing.sessions?.length > 0) {
+                        const mappedInPerson = existing.sessions
+                            .filter((s: any) => s.date && s.startTime && s.endTime)
+                            .map((s: any) => ({ date: s.date, slot: `${s.startTime} - ${s.endTime}`, topic: s.topic || '' }))
+                        if (mappedInPerson.length > 0) setSelectedSessions(mappedInPerson)
                     }
                 }
             } catch (err) {
@@ -398,8 +411,51 @@ function CreateCoursePageInner() {
         if (exists) {
             setSelectedSessions(prev => prev.filter(s => !(s.date === date && s.slot === slot)))
         } else {
-            setSelectedSessions(prev => [...prev, { date, slot }])
+            setSelectedSessions(prev => [...prev, { date, slot, topic: '' }])
         }
+    }
+
+    // Update individual session topic
+    const updateSessionTopic = (date: string, slot: string, topic: string) => {
+        setSelectedSessions(prev => prev.map(s =>
+            s.date === date && s.slot === slot ? { ...s, topic } : s
+        ))
+    }
+
+    // Add a new labeling rule
+    const addLabelingRule = () => {
+        const totalSessions = getOrderedSessions().length
+        const newId = ruleCounter + 1
+        setRuleCounter(newId)
+        setLabelingRules(prev => [...prev, { id: newId, from: 1, to: Math.max(1, totalSessions), label: '' }])
+    }
+
+    // Update a labeling rule
+    const updateLabelingRule = (id: number, field: keyof Omit<LabelingRule, 'id'>, value: string | number) => {
+        setLabelingRules(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+    }
+
+    // Remove a labeling rule
+    const removeLabelingRule = (id: number) => {
+        setLabelingRules(prev => prev.filter(r => r.id !== id))
+    }
+
+    // Get sessions sorted chronologically with index
+    const getOrderedSessions = () => {
+        return [...selectedSessions].sort((a, b) =>
+            a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot)
+        )
+    }
+
+    // Compute effective topic for a session given its 1-based index (grouped mode)
+    const getEffectiveTopic = (idx1based: number): string => {
+        let result = ''
+        for (const rule of labelingRules) {
+            if (idx1based >= rule.from && idx1based <= rule.to && rule.label.trim()) {
+                result = rule.label.trim()
+            }
+        }
+        return result || 'جلسة حضورية'
     }
 
     // --- Submission Logic ---
@@ -435,12 +491,15 @@ function CreateCoursePageInner() {
                     startDate = sortedSessions[0].date;
                     endDate = sortedSessions[sortedSessions.length - 1].date;
 
-                    sessionsPayload = selectedSessions.map(s => ({
+                    const orderedForPayload = getOrderedSessions()
+                    sessionsPayload = orderedForPayload.map((s, idx) => ({
                         date: s.date,
                         startTime: s.slot.split(" - ")[0],
                         endTime: s.slot.split(" - ")[1],
                         location: selectedHall?.name || "القاعة المختارة",
-                        topic: "عنوان الجلسة"
+                        topic: labelingMode === 'individual'
+                            ? (s.topic.trim() || 'جلسة حضورية')
+                            : getEffectiveTopic(idx + 1)
                     }));
                 }
 
@@ -1264,6 +1323,174 @@ function CreateCoursePageInner() {
                                                         ))}
                                                     </div>
                                                 </div>
+
+                                                {/* ── Session Labeling Section ── */}
+                                                <Card className="border border-blue-100 bg-blue-50/40 shadow-none">
+                                                    <CardHeader className="pb-3">
+                                                        <CardTitle className="flex items-center gap-2 text-base">
+                                                            <BookOpen className="h-4 w-4 text-blue-600" />
+                                                            عنونة الجلسات الحضورية
+                                                        </CardTitle>
+                                                        <CardDescription>أضف عنواناً لكل جلسة لتوضيح محتواها للطلاب (اختياري)</CardDescription>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-4">
+                                                        {/* Mode Switcher */}
+                                                        <div className="flex gap-3">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setLabelingMode('individual')}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                                                                    labelingMode === 'individual'
+                                                                        ? 'border-blue-600 bg-blue-600 text-white'
+                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                }`}
+                                                            >
+                                                                <CheckCircle className="h-4 w-4" />
+                                                                عنونة كل جلسة على حدة
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setLabelingMode('grouped')}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                                                                    labelingMode === 'grouped'
+                                                                        ? 'border-blue-600 bg-blue-600 text-white'
+                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                }`}
+                                                            >
+                                                                <ListChecks className="h-4 w-4" />
+                                                                عنونة مجموعة جلسات
+                                                            </button>
+                                                        </div>
+
+                                                        {/* Individual Mode */}
+                                                        {labelingMode === 'individual' && (
+                                                            <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+                                                                <table className="w-full text-right text-sm" dir="rtl">
+                                                                    <thead className="bg-slate-50">
+                                                                        <tr className="text-xs font-semibold text-slate-600">
+                                                                            <th className="px-3 py-2.5 w-8">#</th>
+                                                                            <th className="px-3 py-2.5">التاريخ</th>
+                                                                            <th className="px-3 py-2.5">الفترة</th>
+                                                                            <th className="px-3 py-2.5">عنوان الجلسة</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {getOrderedSessions().map((s, idx) => (
+                                                                            <tr key={`${s.date}-${s.slot}`} className="border-t border-slate-100">
+                                                                                <td className="px-3 py-2 text-slate-400 font-medium">{idx + 1}</td>
+                                                                                <td className="px-3 py-2 whitespace-nowrap text-slate-700">{formatDateLabel(s.date)}</td>
+                                                                                <td className="px-3 py-2 whitespace-nowrap">
+                                                                                    <Badge variant="secondary" className="rounded-[6.5px] bg-slate-100 text-slate-700 shadow-none text-xs">{s.slot}</Badge>
+                                                                                </td>
+                                                                                <td className="px-3 py-2">
+                                                                                    <Input
+                                                                                        value={s.topic}
+                                                                                        onChange={e => updateSessionTopic(s.date, s.slot, e.target.value)}
+                                                                                        placeholder={`مثال: الجلسة ${idx + 1} — المقدمة`}
+                                                                                        className="h-8 text-sm"
+                                                                                    />
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Grouped Mode */}
+                                                        {labelingMode === 'grouped' && (
+                                                            <div className="space-y-3">
+                                                                {labelingRules.length === 0 && (
+                                                                    <p className="text-sm text-slate-500 text-center py-3 border border-dashed border-slate-200 rounded-lg bg-white">
+                                                                        لا توجد قواعد عنونة بعد — اضغط «إضافة قاعدة» لتبدأ
+                                                                    </p>
+                                                                )}
+                                                                {labelingRules.map(rule => (
+                                                                    <div key={rule.id} className="flex items-center gap-2 flex-wrap rounded-lg border border-slate-200 bg-white p-3">
+                                                                        <span className="text-sm text-slate-600 whitespace-nowrap">من جلسة</span>
+                                                                        <Input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            max={selectedSessions.length}
+                                                                            value={rule.from}
+                                                                            onChange={e => updateLabelingRule(rule.id, 'from', Math.max(1, Number(e.target.value)))}
+                                                                            className="h-8 w-20 text-sm text-center"
+                                                                        />
+                                                                        <span className="text-sm text-slate-600 whitespace-nowrap">إلى جلسة</span>
+                                                                        <Input
+                                                                            type="number"
+                                                                            min={1}
+                                                                            max={selectedSessions.length}
+                                                                            value={rule.to}
+                                                                            onChange={e => updateLabelingRule(rule.id, 'to', Math.min(selectedSessions.length, Number(e.target.value)))}
+                                                                            className="h-8 w-20 text-sm text-center"
+                                                                        />
+                                                                        <Input
+                                                                            value={rule.label}
+                                                                            onChange={e => updateLabelingRule(rule.id, 'label', e.target.value)}
+                                                                            placeholder="عنوان المجموعة مثال: الوحدة الأولى"
+                                                                            className="h-8 flex-1 min-w-[160px] text-sm"
+                                                                        />
+                                                                        <Button
+                                                                            type="button"
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="text-red-500 hover:text-red-600 hover:bg-red-50 shrink-0"
+                                                                            onClick={() => removeLabelingRule(rule.id)}
+                                                                        >
+                                                                            <X className="h-4 w-4" />
+                                                                        </Button>
+                                                                    </div>
+                                                                ))}
+                                                                <Button
+                                                                    type="button"
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={addLabelingRule}
+                                                                    className="w-full border-dashed"
+                                                                >
+                                                                    <Plus className="h-4 w-4 mr-1" />
+                                                                    إضافة قاعدة عنونة
+                                                                </Button>
+                                                                {labelingRules.length > 0 && (
+                                                                    <div className="rounded-lg border border-slate-200 bg-white overflow-x-auto">
+                                                                        <div className="px-3 py-2 border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-600">معاينة توزيع العناوين</div>
+                                                                        <table className="w-full text-right text-sm" dir="rtl">
+                                                                            <thead>
+                                                                                <tr className="text-xs text-slate-500">
+                                                                                    <th className="px-3 py-2">#</th>
+                                                                                    <th className="px-3 py-2">التاريخ</th>
+                                                                                    <th className="px-3 py-2">الفترة</th>
+                                                                                    <th className="px-3 py-2">العنوان</th>
+                                                                                </tr>
+                                                                            </thead>
+                                                                            <tbody>
+                                                                                {getOrderedSessions().map((s, idx) => (
+                                                                                    <tr key={`prev-${s.date}-${s.slot}`} className="border-t border-slate-100">
+                                                                                        <td className="px-3 py-1.5 text-slate-400">{idx + 1}</td>
+                                                                                        <td className="px-3 py-1.5 text-slate-700 whitespace-nowrap">{formatDateLabel(s.date)}</td>
+                                                                                        <td className="px-3 py-1.5 whitespace-nowrap">
+                                                                                            <Badge variant="secondary" className="rounded-[6.5px] bg-slate-100 text-slate-700 shadow-none text-xs">{s.slot}</Badge>
+                                                                                        </td>
+                                                                                        <td className="px-3 py-1.5">
+                                                                                            <span className={`text-xs font-medium ${
+                                                                                                getEffectiveTopic(idx + 1) === 'جلسة حضورية'
+                                                                                                    ? 'text-slate-400 italic'
+                                                                                                    : 'text-blue-700'
+                                                                                            }`}>
+                                                                                                {getEffectiveTopic(idx + 1)}
+                                                                                            </span>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                ))}
+                                                                            </tbody>
+                                                                        </table>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
 
                                                 {!isOwnInstituteHall && (
                                                     <Card className="border-2 border-dashed border-blue-200">
