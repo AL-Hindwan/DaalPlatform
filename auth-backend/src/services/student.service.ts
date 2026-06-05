@@ -314,6 +314,64 @@ class StudentService {
     }
 
     /**
+     * Get certificate data for an enrollment
+     */
+    async getEnrollmentCertificateData(userId: string, enrollmentId: string) {
+        const enrollment = await prisma.enrollment.findUnique({
+            where: { id: enrollmentId },
+            include: {
+                student: true,
+                course: {
+                    include: {
+                        trainer: true,
+                        institute: true
+                    }
+                }
+            }
+        });
+
+        if (!enrollment || enrollment.studentId !== userId || (enrollment.status !== 'ACTIVE' && enrollment.status !== 'COMPLETED')) {
+            throw new Error('التسجيل غير موجود أو غير مؤهل لإصدار شهادة');
+        }
+
+        const course = enrollment.course;
+        
+        let trainerName = course.trainer?.name;
+        
+        // Handle institute staff trainers
+        const staffTrainerIds = (course as any).staffTrainerIds as string[] | undefined;
+        if (staffTrainerIds && staffTrainerIds.length > 0) {
+            const staffTrainers = await prisma.instituteStaff.findMany({
+                where: { id: { in: staffTrainerIds } },
+                select: { name: true }
+            });
+            if (staffTrainers.length > 0) {
+                trainerName = staffTrainers.map(t => t.name).join(' و ');
+            }
+        }
+        
+        if (!trainerName) {
+            trainerName = 'غير محدد';
+        }
+
+        const instituteName = course.institute?.name;
+        
+        // Return standard data package
+        return {
+            studentName: enrollment.student.name,
+            courseTitle: course.title,
+            duration: course.duration,
+            startDate: course.startDate,
+            endDate: course.endDate,
+            trainerName,
+            instituteName,
+            enrolledAt: enrollment.enrolledAt,
+            issueDate: new Date()
+        };
+    }
+
+
+    /**
      * Pre-register a student to a course (initial application)
      */
     async preRegisterCourse(userId: string, courseId: string, fullName: string, email: string, phone: string) {

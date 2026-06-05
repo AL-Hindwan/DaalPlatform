@@ -113,6 +113,7 @@ class MailerService {
                     <p>🎉 تهانينا! تم تأكيد تسجيلك نهائياً في دورة <strong>${courseTitle}</strong>.</p>
                 </div>
                 <p>يمكنك الآن الوصول إلى محتوى الدورة والجلسات التدريبية من لوحة التحكم الخاصة بك.</p>
+                <p>كما يمكنك <strong>تحميل شهادة تأكيد التسجيل</strong> بصيغة PDF من خلال زيارة قائمة الإشعارات في حسابك على المنصة.</p>
                 <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/courses">ابدأ التعلم</a>
             `),
         });
@@ -140,6 +141,7 @@ class MailerService {
                 <p>مرحباً <strong>${studentName}</strong>،</p>
                 <div class="card"><p>✅ تم التحقق من دفعتك لدورة <strong>${courseTitle}</strong> والموافقة عليها.</p></div>
                 <p>تسجيلك مكتمل الآن. نتمنى لك تجربة تعليمية رائعة!</p>
+                <p>كما يمكنك <strong>تحميل شهادة تأكيد التسجيل</strong> بصيغة PDF من خلال زيارة قائمة الإشعارات في حسابك على المنصة.</p>
                 <a class="btn" href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/student/courses">دوراتي</a>
             `),
         });

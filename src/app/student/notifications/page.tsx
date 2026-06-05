@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { useNotifications } from "@/contexts/notification-context"
 import { NotificationMessage } from "@/components/notifications/notification-message"
 import { toast } from "sonner"
 import Link from "next/link"
+import { downloadRegistrationCertificate } from "@/lib/certificate-generator"
 
 export default function StudentNotificationsPage() {
   const radiusClass = "rounded-[6.5px]"
@@ -24,6 +25,7 @@ export default function StudentNotificationsPage() {
   const [selected, setSelected] = useState<NotificationItem | null>(null)
   const [knownCourseIds, setKnownCourseIds] = useState<Set<string>>(new Set())
   const [entityToCourseId, setEntityToCourseId] = useState<Map<string, string>>(new Map())
+  const [isDownloadingCert, setIsDownloadingCert] = useState(false)
   const { refreshUnreadCount, clearUnread } = useNotifications()
 
   const fetchNotifications = useCallback(async () => {
@@ -207,6 +209,22 @@ export default function StudentNotificationsPage() {
     return raw
   }
 
+  const handleDownloadCertificate = async (enrollmentId: string) => {
+    if (!enrollmentId) {
+      toast.error("تعذر العثور على بيانات التسجيل المرتبطة بهذا الإشعار")
+      return
+    }
+    
+    try {
+      setIsDownloadingCert(true)
+      await downloadRegistrationCertificate(enrollmentId, "منصة دال")
+    } catch (error) {
+      // Error is handled in the utility
+    } finally {
+      setIsDownloadingCert(false)
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-[980px] px-4 pb-8 pt-3 sm:px-6 sm:pt-4" dir="rtl">
       <Card className={`mb-4 border-slate-200 shadow-sm sm:mb-5 ${radiusClass}`}>
@@ -356,6 +374,26 @@ export default function StudentNotificationsPage() {
                     </Link>
                   </Button>
                 )}
+                
+                {(selected.originalType === "ENROLLMENT_FINAL_ACCEPTED" || 
+                  selected.originalType === "PAYMENT_APPROVED" || 
+                  selected.title?.includes("تم قبول الدفع") || 
+                  selected.title?.includes("تم قبولك نهائياً")) && (
+                  <Button 
+                    variant="default" 
+                    className={`flex-1 bg-blue-600 text-white hover:bg-blue-700 ${radiusClass}`} 
+                    onClick={() => handleDownloadCertificate(selected.relatedEntityId!)}
+                    disabled={isDownloadingCert}
+                  >
+                    {isDownloadingCert ? (
+                      <Loader2 className="ml-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="ml-2">📄</span>
+                    )}
+                    شهادة التسجيل
+                  </Button>
+                )}
+                
                 <Button variant="outline" className={`flex-1 ${radiusClass}`} onClick={() => setSelected(null)}>
                   إغلاق
                 </Button>

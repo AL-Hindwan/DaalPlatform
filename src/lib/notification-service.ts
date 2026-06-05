@@ -3,6 +3,7 @@ import apiClient from './api-client';
 export interface NotificationItem {
     id: string;
     type: string;
+    originalType?: string;
     title: string;
     message: string;
     isRead: boolean;

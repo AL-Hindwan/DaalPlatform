@@ -15,8 +15,9 @@ router.get('/my-courses', authenticate, studentController.getMyCourses);
 // Schedule
 router.get('/schedule', authenticate, studentController.getSchedule);
 
-// Enrollment Status
+// Enrollment Status & Certificate
 router.get('/courses/:courseId/enrollment-status', authenticate, studentController.getEnrollmentStatus);
+router.get('/enrollments/:enrollmentId/certificate', authenticate, studentController.getEnrollmentCertificateData);
 
 // Course Details
 router.get('/courses/:id', authenticate, studentController.getCourseDetails);

@@ -81,6 +81,7 @@ export class NotificationService {
         return notifications.map(n => ({
             id: n.id,
             type: typeMap[n.type] ?? n.type.toLowerCase(),
+            originalType: n.type,
             title: n.title ?? '',
             message: n.message ?? '',
             isRead: n.isRead,

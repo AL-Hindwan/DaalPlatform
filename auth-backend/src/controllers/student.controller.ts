@@ -68,6 +68,22 @@ class StudentController {
     }
 
     /**
+     * Get certificate data for an enrollment
+     */
+    async getEnrollmentCertificateData(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (!canUseLearnerEnrollment(req.user?.role)) {
+                return sendError(res, 'غير مصرح لك بالوصول', 403);
+            }
+            const { enrollmentId } = req.params;
+            const data = await studentService.getEnrollmentCertificateData(req.user.userId, enrollmentId);
+            return sendSuccess(res, 'تم جلب بيانات الشهادة بنجاح', data);
+        } catch (error: any) {
+            return sendError(res, error.message, 400);
+        }
+    }
+
+    /**
      * Pre-register for a course
      */
     async preRegisterCourse(req: AuthRequest, res: Response, _next: NextFunction) {
