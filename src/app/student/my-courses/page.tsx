@@ -1,7 +1,8 @@
-﻿"use client"
+"use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -96,8 +97,11 @@ function StatusTab({
   )
 }
 
-export default function MyCoursesPage() {
-  const [activeTab, setActiveTab] = useState<StatusKey>("active")
+function MyCoursesPageContent() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [activeTab, setActiveTab] = useState<StatusKey>((searchParams.get("tab") as StatusKey) || "active")
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [selectedEnrollment, setSelectedEnrollment] = useState<string | null>(null)
   const [enrollments, setEnrollments] = useState<EnrollmentWithCourse[]>([])
@@ -126,6 +130,21 @@ export default function MyCoursesPage() {
   useEffect(() => {
     fetchCourses()
   }, [])
+
+  useEffect(() => {
+    const tab = searchParams.get("tab") as StatusKey
+    if (tab && statusMeta[tab]) {
+      setActiveTab(tab)
+    }
+  }, [searchParams])
+
+  const handleTabChange = (v: string) => {
+    const newTab = v as StatusKey
+    setActiveTab(newTab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set("tab", newTab)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
 
   const getEnrollmentsByStatus = (status: StatusKey) => {
     if (status === "active") return enrollments.filter((e) => e.status === "active")
@@ -207,6 +226,7 @@ export default function MyCoursesPage() {
         }}
         instructors={(enrollment.course.trainers || []).map((t) => ({ name: t.name, avatar: getFileUrl(t.avatar) || undefined }))}
         basePath={courseDetailsPath}
+        primaryHref={`${courseDetailsPath}/${enrollment.course.id}?from=my-courses&tab=${activeTab}`}
         imageVariant="browse"
         fullWidthButton
         hideFavoriteButton
@@ -320,16 +340,16 @@ export default function MyCoursesPage() {
           <p className="mt-1 text-sm text-slate-500">تابع تقدمك في الدورات وقم بإدارة رحلتك التعليمية</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as StatusKey)} dir="rtl">
+        <Tabs value={activeTab} onValueChange={handleTabChange} dir="rtl">
           <div
             role="tablist"
             aria-label="حالات الدورات"
             className="mb-4 grid w-full grid-cols-2 gap-1 rounded-[6.5px] border border-slate-200 bg-slate-100 p-1 shadow-sm md:grid-cols-4"
           >
-            <StatusTab label={statusMeta.active.label} count={statusCounts.active} isActive={activeTab === "active"} onClick={() => setActiveTab("active")} />
-            <StatusTab label={statusMeta.pending.label} count={statusCounts.pending} isActive={activeTab === "pending"} onClick={() => setActiveTab("pending")} />
-            <StatusTab label={statusMeta.completed.label} count={statusCounts.completed} isActive={activeTab === "completed"} onClick={() => setActiveTab("completed")} />
-            <StatusTab label={statusMeta.cancelled.label} count={statusCounts.cancelled} isActive={activeTab === "cancelled"} onClick={() => setActiveTab("cancelled")} />
+            <StatusTab label={statusMeta.active.label} count={statusCounts.active} isActive={activeTab === "active"} onClick={() => handleTabChange("active")} />
+            <StatusTab label={statusMeta.pending.label} count={statusCounts.pending} isActive={activeTab === "pending"} onClick={() => handleTabChange("pending")} />
+            <StatusTab label={statusMeta.completed.label} count={statusCounts.completed} isActive={activeTab === "completed"} onClick={() => handleTabChange("completed")} />
+            <StatusTab label={statusMeta.cancelled.label} count={statusCounts.cancelled} isActive={activeTab === "cancelled"} onClick={() => handleTabChange("cancelled")} />
           </div>
 
           <TabsContent value="active" className="mt-0">
@@ -457,6 +477,14 @@ export default function MyCoursesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function MyCoursesPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <MyCoursesPageContent />
+    </Suspense>
   )
 }
 

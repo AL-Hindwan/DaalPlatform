@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { isAxiosError } from "axios"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, usePathname, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useRef, useState, type ElementType } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -287,6 +287,10 @@ function mapEnrollmentStatusToUI(status: string): RegistrationUIState {
 export default function TrainerExploreCourseDetailsPage() {
   const { user } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const from = searchParams.get("from")
+  const tab = searchParams.get("tab")
   const params = useParams()
   const courseId = typeof params.id === "string" ? params.id : ""
 
@@ -335,7 +339,7 @@ export default function TrainerExploreCourseDetailsPage() {
     studentService
       .getWishlist()
       .then((items) => setIsFavorite(items.some((item: { id?: string }) => item.id === courseId)))
-      .catch(() => {})
+      .catch(() => { })
   }, [courseId, user?.id])
 
   useEffect(() => {
@@ -531,7 +535,12 @@ export default function TrainerExploreCourseDetailsPage() {
       cleanText(course.instructor?.specialties?.[0]) ||
       cleanText(course.instructor?.bio) ||
       (hasInstitute ? "معهد تدريبي" : "مدرب مستقل")
-    const delivery = deliveryLabel(course.deliveryType)
+    const courseStatus = String(course.courseStatus || (course as any).status);
+    const isPendingOrDraft = courseStatus === "PENDING_MINIMUM" || courseStatus === "DRAFT";
+    const delivery = isPendingOrDraft ? "غير محدد" : deliveryLabel(course.deliveryType);
+    const actualStartDate = isPendingOrDraft ? null : course.startDate;
+    const actualEndDate = isPendingOrDraft ? null : course.endDate;
+
     const deliveryDetail =
       course.deliveryType === "online"
         ? onlinePlatformLabel(firstOnlineSession?.location || firstOnlineSession?.meetingLink || "")
@@ -550,9 +559,9 @@ export default function TrainerExploreCourseDetailsPage() {
       objectives,
       prerequisites,
       sessions,
-      durationWeeks: computeDurationWeeks(course.startDate, course.endDate),
-      startDate: formatArabicDate(course.startDate),
-      endDate: formatArabicDate(course.endDate),
+      durationWeeks: computeDurationWeeks(actualStartDate, actualEndDate),
+      startDate: actualStartDate,
+      endDate: actualEndDate,
       delivery,
       deliveryDetail,
       instructor: course.instructor,
@@ -569,7 +578,7 @@ export default function TrainerExploreCourseDetailsPage() {
         email: instituteEmail,
         logo: instituteLogo,
       },
-      courseStatus: course.courseStatus || (course as any).status,
+      courseStatus,
       minStudents: Number(course.minStudents || 0),
     }
   }, [course])
@@ -624,14 +633,21 @@ export default function TrainerExploreCourseDetailsPage() {
   const heroMetaItems = [
     view.category ? { icon: Tag, label: view.category } : null,
     view.delivery
-      ? { icon: Globe, label: view.deliveryDetail ? `${view.delivery}${view.delivery === "حضوري" || view.delivery === "أونلاين" ? `: ${view.deliveryDetail}` : ""}` : view.delivery }
+      ? {
+        icon: Globe,
+        label: view.deliveryDetail && view.deliveryDetail !== "غير محدد" && !(view.courseStatus === "PENDING_MINIMUM" || view.courseStatus === "DRAFT")
+          ? `${view.delivery}: ${view.deliveryDetail}`
+          : view.delivery
+      }
       : null,
     view.durationWeeks > 0 ? { icon: Clock, label: formatWeeksLabel(view.durationWeeks) } : null,
   ].filter(Boolean) as { icon: ElementType; label: string }[]
 
   const heroScheduleItems = [
-    view.startDate || view.endDate ? { icon: Calendar, label: `${view.startDate}${view.endDate ? ` - ${view.endDate}` : ""}` } : null,
-    computeDurationDays(course.startDate, course.endDate) > 0 ? { icon: Clock, label: `${computeDurationDays(course.startDate, course.endDate)} يوم` } : null,
+    view.startDate || view.endDate
+      ? { icon: Calendar, label: `${formatArabicDate(view.startDate)}${view.endDate ? ` - ${formatArabicDate(view.endDate)}` : ""}` }
+      : { icon: Calendar, label: "سيُحدَّد لاحقاً" },
+    computeDurationDays(view.startDate, view.endDate) > 0 ? { icon: Clock, label: `${computeDurationDays(view.startDate, view.endDate)} يوم` } : null,
   ].filter(Boolean) as { icon: ElementType; label: string }[]
 
   const seatSummaryParts = [view.seats || view.seats === 0 ? `${view.seats} متاح` : null, view.enrolled || view.enrolled === 0 ? `${view.enrolled} مسجل` : null].filter(Boolean) as string[]
@@ -654,6 +670,37 @@ export default function TrainerExploreCourseDetailsPage() {
     active: index === 0,
   }))
 
+  let backLink = "/courses"
+  let backText = "العودة للاستكشاف"
+  
+  if (from === "my-courses") {
+    if (pathname.startsWith("/student")) {
+      backLink = tab ? `/student/my-courses?tab=${tab}` : "/student/my-courses"
+      backText = "العودة إلى دوراتي"
+    }
+    else if (pathname.startsWith("/trainer")) {
+      backLink = "/trainer/courses"
+      backText = "العودة لإدارة الدورات"
+    }
+    else if (pathname.startsWith("/institute")) {
+      backLink = "/institute/courses"
+      backText = "العودة لإدارة الدورات"
+    }
+  } else if (pathname.startsWith("/student/explore")) {
+    backLink = "/student/courses" // Browse courses for students
+  } else if (pathname.startsWith("/student")) {
+    backLink = "/student/my-courses" // My courses
+    backText = "العودة إلى دوراتي"
+  } else if (pathname.startsWith("/institute/courses")) {
+    backLink = "/institute/courses"
+    backText = "العودة لإدارة الدورات"
+  } else if (pathname.startsWith("/trainer/courses")) {
+    backLink = "/trainer/courses"
+    backText = "العودة لإدارة الدورات"
+  } else if (pathname.startsWith("/trainer/explore")) {
+    backLink = "/trainer/explore"
+  }
+
   return (
     <div className="min-h-screen bg-[#F5F7FB] text-right" dir="rtl">
       <section className="w-full overflow-visible bg-gradient-to-l from-blue-600 to-sky-500 text-white">
@@ -662,9 +709,9 @@ export default function TrainerExploreCourseDetailsPage() {
             <div className="space-y-3 text-right">
               <div className="flex flex-wrap items-center justify-start gap-2">
                 <Button asChild variant="outline" className="h-10 rounded-[6.5px] border-white/20 bg-white/10 px-4 text-white hover:bg-white/15 hover:text-white">
-                  <Link href="/trainer/explore">
+                  <Link href={backLink}>
                     <ArrowRight className="ml-2 h-4 w-4" />
-                    العودة للاستكشاف
+                    {backText}
                   </Link>
                 </Button>
               </div>
@@ -740,28 +787,26 @@ export default function TrainerExploreCourseDetailsPage() {
                         <div key={step.label} className="contents">
                           <div className="z-10 flex flex-col items-center justify-start text-center">
                             <span
-                              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold shadow-sm ${
-                                isCurrentRejected
-                                  ? "border-rose-200 bg-rose-500 text-white"
-                                  : isCurrent
-                                    ? "border-white/35 bg-white text-blue-700"
-                                    : isCompleted
-                                      ? "border-white/20 bg-white/20 text-white"
-                                      : "border-white/25 bg-white/10 text-white/80"
-                              }`}
+                              className={`inline-flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-bold shadow-sm ${isCurrentRejected
+                                ? "border-rose-200 bg-rose-500 text-white"
+                                : isCurrent
+                                  ? "border-white/35 bg-white text-blue-700"
+                                  : isCompleted
+                                    ? "border-white/20 bg-white/20 text-white"
+                                    : "border-white/25 bg-white/10 text-white/80"
+                                }`}
                             >
                               {index + 1}
                             </span>
                             <span
-                              className={`mt-2 text-[11px] font-medium leading-5 ${
-                                isCurrentRejected
-                                  ? "text-rose-100"
-                                  : isCurrent
-                                    ? "text-white"
-                                    : isCompleted
-                                      ? "text-white/90"
-                                      : "text-white/70"
-                              }`}
+                              className={`mt-2 text-[11px] font-medium leading-5 ${isCurrentRejected
+                                ? "text-rose-100"
+                                : isCurrent
+                                  ? "text-white"
+                                  : isCompleted
+                                    ? "text-white/90"
+                                    : "text-white/70"
+                                }`}
                             >
                               {step.label}
                             </span>
@@ -769,9 +814,8 @@ export default function TrainerExploreCourseDetailsPage() {
                           {index < registrationSteps.length - 1 ? (
                             <div
                               aria-hidden="true"
-                              className={`mx-3 mt-[18px] h-px self-start ${
-                                (isEnrollmentRejected || isEnrollmentCancelled) ? "bg-rose-200/70" : index < registrationUI.currentStep ? "bg-white/80" : "bg-white/25"
-                              }`}
+                              className={`mx-3 mt-[18px] h-px self-start ${(isEnrollmentRejected || isEnrollmentCancelled) ? "bg-rose-200/70" : index < registrationUI.currentStep ? "bg-white/80" : "bg-white/25"
+                                }`}
                             />
                           ) : null}
                         </div>
@@ -792,8 +836,8 @@ export default function TrainerExploreCourseDetailsPage() {
             <div className="w-full shrink-0 lg:absolute lg:bottom-0 lg:left-6 lg:w-[340px] lg:translate-y-[42%]">
               <Card className="overflow-hidden rounded-[6.5px] border border-white/20 bg-gradient-to-b from-blue-900/45 via-blue-800/35 to-blue-950/30 shadow-[0_10px_24px_rgba(15,23,42,0.12)] backdrop-blur-md">
                 <div className="relative h-[190px] overflow-hidden rounded-t-[6.5px] bg-slate-100">
-                    <Image src={resolveImage(course.image)} alt={view.title} fill className="object-cover" unoptimized />
-                  </div>
+                  <Image src={resolveImage(course.image)} alt={view.title} fill className="object-cover" unoptimized />
+                </div>
                 <CardContent className="space-y-3 p-4 text-center">
                   <div className="space-y-1">
                     <div className="text-[1.65rem] font-extrabold leading-tight text-white">
@@ -813,7 +857,7 @@ export default function TrainerExploreCourseDetailsPage() {
                         <span>{view.enrolled} / {view.minStudents} مقعد كحد أدنى</span>
                       </div>
                       <div className="h-2 w-full overflow-hidden rounded-full bg-slate-900/40">
-                        <div 
+                        <div
                           className="h-full bg-amber-400 transition-all duration-500"
                           style={{ width: `${Math.min(100, Math.max(0, (view.enrolled / view.minStudents) * 100))}%` }}
                         />
@@ -852,9 +896,8 @@ export default function TrainerExploreCourseDetailsPage() {
               <a
                 key={item.href}
                 href={item.href}
-                className={`inline-flex h-9 shrink-0 items-center border-b-2 px-3 text-sm font-semibold ${
-                  item.href === `#${(typeof window !== "undefined" ? window.location.hash.replace("#", "") : "")}` ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                }`}
+                className={`inline-flex h-9 shrink-0 items-center border-b-2 px-3 text-sm font-semibold ${item.href === `#${(typeof window !== "undefined" ? window.location.hash.replace("#", "") : "")}` ? "border-[#2563EB] text-[#2563EB]" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  }`}
               >
                 {item.label}
               </a>
@@ -1039,9 +1082,8 @@ export default function TrainerExploreCourseDetailsPage() {
               {registrationFlowSteps.map((step, index) => (
                 <div key={step.label} className="inline-flex items-center gap-2">
                   <span
-                    className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-2 ${
-                      step.active ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-500"
-                    }`}
+                    className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full border px-2 ${step.active ? "border-blue-500 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}
                   >
                     {index + 1}
                   </span>
@@ -1136,9 +1178,8 @@ export default function TrainerExploreCourseDetailsPage() {
               {registrationSteps.map((step, index) => (
                 <div
                   key={step.label}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${
-                    index === 1 ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-500"
-                  }`}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 ${index === 1 ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200 bg-slate-50 text-slate-500"
+                    }`}
                 >
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white text-[11px] font-bold text-blue-700">
                     {index + 1}
@@ -1168,11 +1209,10 @@ export default function TrainerExploreCourseDetailsPage() {
                             setSelectedBankAccountId(account.id)
                           }
                         }}
-                        className={`w-full cursor-pointer rounded-[6.5px] border p-4 text-right transition ${
-                          isSelected
-                            ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/30"
-                            : "border-slate-200 bg-slate-50 hover:border-blue-300"
-                        }`}
+                        className={`w-full cursor-pointer rounded-[6.5px] border p-4 text-right transition ${isSelected
+                          ? "border-blue-500 ring-2 ring-blue-100 bg-blue-50/30"
+                          : "border-slate-200 bg-slate-50 hover:border-blue-300"
+                          }`}
                       >
                         <div className="grid gap-2 text-sm">
                           <div className="flex items-center justify-start gap-2" dir="rtl">
@@ -1203,12 +1243,12 @@ export default function TrainerExploreCourseDetailsPage() {
                             </p>
                             {account.iban ? (
                               <Button
-                              type="button"
-                              variant="outline"
-                              className="h-8 rounded-[6.5px] border border-slate-200 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                handleCopy(account.iban!, `iban-${account.id}`)
+                                type="button"
+                                variant="outline"
+                                className="h-8 rounded-[6.5px] border border-slate-200 bg-white px-3 text-xs text-slate-700 hover:bg-slate-100"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  handleCopy(account.iban!, `iban-${account.id}`)
                                 }}
                               >
                                 {copiedKey === `iban-${account.id}` ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}

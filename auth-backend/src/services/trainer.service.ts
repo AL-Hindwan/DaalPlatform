@@ -1484,8 +1484,16 @@ class TrainerService {
             topic: session.topic || "",
         }));
 
-        let finalStartDate = new Date(data.startDate || Date.now());
-        let finalEndDate = new Date(data.endDate || Date.now());
+        // تحديد التواريخ: null لدورات انتظار اكتمال العدد والمسودات
+        let finalStartDate: Date | null = null;
+        let finalEndDate: Date | null = null;
+
+        if (data.startDate && data.startDate !== '') {
+            finalStartDate = new Date(data.startDate);
+        }
+        if (data.endDate && data.endDate !== '') {
+            finalEndDate = new Date(data.endDate);
+        }
 
         if (mappedSessions.length > 0) {
             const sortedSessions = [...mappedSessions].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
@@ -1547,8 +1555,8 @@ class TrainerService {
             const roomBooking = await prisma.roomBooking.create({
                 data: {
                     bookingMode: "CUSTOM_TIME",
-                    startDate: finalStartDate,
-                    endDate: finalEndDate,
+                    startDate: finalStartDate!, // guaranteed non-null — only reached when sessions exist
+                    endDate: finalEndDate!,
                     selectedDays: [],
                     defaultStartTime: mappedSessions[0]?.startTime || new Date(),
                     defaultEndTime: mappedSessions[0]?.endTime || new Date(),

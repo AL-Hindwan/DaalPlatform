@@ -212,7 +212,7 @@ export function CourseCard({
                     </div>
                 )}
 
-                <Link href={`${basePath}/${id}`} className="group-hover:text-primary transition-colors">
+                <Link href={primaryHref || `${basePath}/${id}`} className="group-hover:text-primary transition-colors">
                     <h3 className="font-bold text-lg leading-tight line-clamp-2 mb-1">
                         {title}
                     </h3>

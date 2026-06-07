@@ -1,9 +1,9 @@
-﻿"use client"
+"use client"
 
 import Link from "next/link"
 import Image from "next/image"
 import { useEffect, useMemo, useState } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -80,9 +80,14 @@ function parseAnnouncementText(raw?: string | null) {
   }
 }
 
-export default function StudentEnrolledCoursePage() {
+import * as import_react from "react"
+
+function StudentEnrolledCoursePageContent() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const courseId = typeof params.id === "string" ? params.id : ""
+  const tab = searchParams.get("tab")
+  const backLink = tab ? `/student/my-courses?tab=${tab}` : "/student/my-courses"
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +184,7 @@ export default function StudentEnrolledCoursePage() {
               <h2 className="mb-1 text-xl font-bold text-slate-900">تعذر عرض الصفحة</h2>
               <p className="text-slate-500">{error || "الدورة غير متاحة"}</p>
               <Button asChild className="mt-4">
-                <Link href="/student/my-courses">العودة إلى دوراتي</Link>
+                <Link href={backLink}>العودة إلى دوراتي</Link>
               </Button>
             </CardContent>
           </Card>
@@ -193,7 +198,7 @@ export default function StudentEnrolledCoursePage() {
       <div className="mx-auto max-w-[1280px] space-y-5">
         <div className="flex justify-start">
           <Button asChild variant="outline" className="rounded-lg border-slate-200">
-            <Link href="/student/my-courses">
+            <Link href={backLink}>
               <ArrowRight className="ml-2 h-4 w-4" />
               العودة إلى دوراتي
             </Link>
@@ -350,7 +355,7 @@ export default function StudentEnrolledCoursePage() {
                   </div>
                   <div className="flex flex-wrap items-center justify-start gap-2">
                     <Button asChild className="h-10 rounded-[6.5px] bg-blue-600 px-4 hover:bg-blue-700">
-                      <Link href="/student/my-courses">العودة إلى دوراتي</Link>
+                      <Link href={backLink}>العودة إلى دوراتي</Link>
                     </Button>
                     <Button asChild variant="outline" className="h-10 rounded-[6.5px] border-blue-200 px-4 text-blue-700 hover:bg-blue-50">
                       <Link href="/student/courses">استعراض الدورات</Link>
@@ -493,6 +498,14 @@ export default function StudentEnrolledCoursePage() {
         </div>
       </div>
     </section>
+  )
+}
+
+export default function StudentEnrolledCoursePage() {
+  return (
+    <import_react.Suspense fallback={null}>
+      <StudentEnrolledCoursePageContent />
+    </import_react.Suspense>
   )
 }
 

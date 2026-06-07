@@ -466,13 +466,14 @@ export default function EditCoursePage() {
             }
 
             // Calculate Dates
-            let startDate: string, endDate: string;
+            let startDate: string = '';
+            let endDate: string = '';
             let sessionsPayload: any[] = [];
 
-            if (status === 'DRAFT') {
-                // Drafts and PENDING_MINIMUM don't need hall/session, save with placeholders
-                startDate = new Date().toISOString().split('T')[0];
-                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            if (status === 'DRAFT' || status === 'PENDING_MINIMUM') {
+                // المسودة ودورات انتظار اكتمال العدد لا تحتاج مواعيد — ترسل فارغة
+                startDate = '';
+                endDate = '';
                 sessionsPayload = [];
             } else if (courseData.deliveryType === 'in_person') {
                 if (status === 'ACTIVE') {
@@ -481,8 +482,8 @@ export default function EditCoursePage() {
                 }
 
                 if (selectedSessions.length === 0) {
-                    startDate = new Date().toISOString().split('T')[0];
-                    endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                    startDate = '';
+                    endDate = '';
                     sessionsPayload = [];
                 } else {
                     const sortedSessions = [...selectedSessions].sort((a, b) => a.date.localeCompare(b.date));
@@ -521,9 +522,9 @@ export default function EditCoursePage() {
                     };
                 });
             } else {
-                // Capacity based or other
-                startDate = new Date().toISOString().split('T')[0];
-                endDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                // capacity_based أو غير محدد — لا تواريخ
+                startDate = '';
+                endDate = '';
             }
 
             const formData = new FormData()

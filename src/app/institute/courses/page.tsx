@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
@@ -235,7 +235,7 @@ export default function InstituteCourses() {
                 </section>
                 <section className="text-center text-sm font-semibold text-slate-700">{course.enrolledStudents || 0}/{course.maxStudents || 0}</section>
                 <section className="text-center text-sm font-semibold text-[#2563EB]">{formatPrice(course.price)} ر.ي</section>
-                <section className="text-center text-sm text-slate-700">{course.startDate ? formatDate(course.startDate) : "-"}</section>
+                <section className="text-center text-sm text-slate-700">{course.startDate ? formatDate(course.startDate) : <span className="text-xs text-amber-600 font-medium">سيُحدَّد لاحقاً</span>}</section>
                 <section className="text-center">{getStatusBadge(course.status)}</section>
                 <section className="flex justify-center">
                   <DropdownMenu dir="rtl">
@@ -267,7 +267,7 @@ export default function InstituteCourses() {
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="rounded-[6.5px] border border-slate-200 p-2 text-right"><p className="text-xs text-slate-500">الطلاب</p><p className="font-semibold text-slate-800">{course.enrolledStudents || 0}/{course.maxStudents || 0}</p></div>
                   <div className="rounded-[6.5px] border border-slate-200 p-2 text-right"><p className="text-xs text-slate-500">السعر</p><p className="font-semibold text-[#2563EB]">{formatPrice(course.price)} ر.ي</p></div>
-                  <div className="rounded-[6.5px] border border-slate-200 p-2 text-right"><p className="text-xs text-slate-500">تاريخ البداية</p><p className="font-semibold text-slate-800">{course.startDate ? formatDate(course.startDate) : "-"}</p></div>
+                  <div className="rounded-[6.5px] border border-slate-200 p-2 text-right"><p className="text-xs text-slate-500">تاريخ البداية</p><p className="font-semibold text-slate-800">{course.startDate ? formatDate(course.startDate) : <span className="text-xs text-amber-600">سيُحدَّد لاحقاً</span>}</p></div>
                   <div className="rounded-[6.5px] border border-slate-200 p-2 text-right"><p className="text-xs text-slate-500">الحالة</p>{getStatusBadge(course.status)}</div>
                 </div>
                 <div className="flex justify-start">

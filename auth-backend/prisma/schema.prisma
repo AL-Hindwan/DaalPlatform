@@ -148,8 +148,8 @@ model Course {
   shortDescription String?         @map("short_description")
   price            Decimal
   duration         Int
-  startDate        DateTime        @map("start_date")
-  endDate          DateTime        @map("end_date")
+  startDate        DateTime?       @map("start_date")
+  endDate          DateTime?       @map("end_date")
   minStudents      Int             @default(1) @map("min_students")
   maxStudents      Int             @map("max_students")
   status           CourseStatus    @default(DRAFT)
