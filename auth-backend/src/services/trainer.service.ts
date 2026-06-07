@@ -1080,6 +1080,7 @@ class TrainerService {
                         phone: true,
                         address: true,
                         website: true,
+                        locationUrl: true,
                         description: true,
                         user: { select: { avatar: true } },
                         bankAccounts: {
@@ -1172,6 +1173,7 @@ class TrainerService {
                 phone: (course as any).institute.phone,
                 address: (course as any).institute.address,
                 website: (course as any).institute.website,
+                locationUrl: (course as any).institute.locationUrl,
                 description: (course as any).institute.description,
             } : null,
             instructor: {

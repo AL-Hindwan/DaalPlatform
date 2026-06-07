@@ -602,7 +602,9 @@ class StudentService {
                                 logo: true,
                                 email: true,
                                 phone: true,
-                                description: true
+                                address: true,
+                                description: true,
+                                locationUrl: true
                             }
                         }
                     }
@@ -721,11 +723,14 @@ class StudentService {
                 specialties: (course.trainer as any)?.trainerProfile?.specialties || []
             },
             staffTrainers,
-            institute: (course.trainerId === null && (course as any).institute) ? {
+            institute: (course as any).institute ? {
+                id: (course as any).institute.id,
                 name: (course as any).institute.name,
                 logo: (course as any).institute.logo,
                 email: (course as any).institute.email,
                 phone: (course as any).institute.phone,
+                address: (course as any).institute.address,
+                locationUrl: (course as any).institute.locationUrl,
                 description: (course as any).institute.description,
             } : null,
             sessions: course.sessions.map(s => ({

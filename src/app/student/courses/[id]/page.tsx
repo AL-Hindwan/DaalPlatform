@@ -23,6 +23,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Lock,
+  MapPin,
 } from "lucide-react"
 import { studentService } from "@/lib/student-service"
 import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
@@ -488,8 +489,48 @@ function StudentEnrolledCoursePageContent() {
                       <p className="text-xs text-slate-500">{institute.description || ""}</p>
                     </div>
                   </div>
-                  <SideRow icon={Mail} text={institute.email || "-"} />
-                  <SideRow icon={Phone} text={institute.phone || "-"} />
+                  
+                  {institute.locationUrl ? (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <a href={institute.locationUrl} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:text-blue-700 hover:underline break-all">
+                        {institute.address || "عرض الموقع على الخريطة"}
+                      </a>
+                    </div>
+                  ) : institute.address ? (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <MapPin className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="text-sm text-slate-700 break-all">{institute.address}</span>
+                    </div>
+                  ) : null}
+
+                  {institute.email ? (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <a href={`mailto:${institute.email}`} className="text-sm text-blue-600 hover:text-blue-700 hover:underline break-all">
+                        {institute.email}
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <Mail className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="text-sm text-slate-700">-</span>
+                    </div>
+                  )}
+
+                  {institute.phone ? (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <Phone className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <a href={`https://wa.me/${normalizePhone(institute.phone)}`} target="_blank" rel="noreferrer" className="text-sm text-green-600 hover:text-green-700 hover:underline break-all">
+                        {institute.phone}
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 py-1" dir="rtl">
+                      <Phone className="h-3.5 w-3.5 text-slate-500 shrink-0" />
+                      <span className="text-sm text-slate-700">-</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ) : null}

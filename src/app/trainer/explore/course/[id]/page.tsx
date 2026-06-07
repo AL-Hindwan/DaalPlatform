@@ -512,6 +512,7 @@ export default function TrainerExploreCourseDetailsPage() {
       phone?: string | null
       email?: string | null
       logo?: string | null
+      description?: string | null
     }
     const trainerName =
       cleanText(raw?.trainer?.name) ||
@@ -523,10 +524,12 @@ export default function TrainerExploreCourseDetailsPage() {
 
     const instituteName = cleanText(instituteRaw?.name) || "غير متوفر"
     const instituteLocation = cleanText(instituteRaw?.address) || cleanText(instituteRaw?.location) || "غير متوفر"
-    const instituteLocationUrl = normalizeExternalUrl(instituteRaw?.website || instituteRaw?.locationUrl || null)
+    const instituteLocationUrl = normalizeExternalUrl(instituteRaw?.locationUrl || null)
+    const instituteWebsiteUrl = normalizeExternalUrl(instituteRaw?.website || null)
     const institutePhone = cleanText(instituteRaw?.phone) || "غير متوفر"
     const instituteEmail = cleanText(instituteRaw?.email) || "غير متوفر"
     const instituteLogo = instituteRaw?.logo || null
+    const instituteDescription = cleanText(instituteRaw?.description) || null
     const isTrainerOwnedCourse = Boolean(course.trainerId)
     const hasInstitute = !isTrainerOwnedCourse && Boolean(course.instituteId)
     const trainerPhone = cleanText(course.instructor?.phone) || (isTrainerOwnedCourse ? "غير متوفر" : institutePhone)
@@ -577,6 +580,7 @@ export default function TrainerExploreCourseDetailsPage() {
         phone: institutePhone,
         email: instituteEmail,
         logo: instituteLogo,
+        description: instituteDescription,
       },
       courseStatus,
       minStudents: Number(course.minStudents || 0),
@@ -1055,6 +1059,81 @@ export default function TrainerExploreCourseDetailsPage() {
               </div>
             </div>
           </section>
+
+          {view.hasInstitute && view.institute.name !== "غير متوفر" ? (
+            <section id="institute" className="scroll-mt-24">
+              <SectionTitle icon={Landmark} title="المعهد المستضيف" />
+              <div className="w-full rounded-[6.5px] border border-slate-200 bg-white p-4">
+                <div dir="rtl" className="flex items-start justify-start gap-4 text-right">
+                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[6.5px] bg-slate-100 md:h-20 md:w-20">
+                    {view.institute.logo ? (
+                      <Image
+                        src={resolveImage(view.institute.logo, "/images/course-web.png")}
+                        alt={view.institute.name}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-xl font-bold text-slate-700">
+                        {getInitials(view.institute.name)}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 text-right">
+                    <h4 className="text-xl font-bold text-slate-900">{view.institute.name}</h4>
+                    {view.institute.description ? (
+                      <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">{view.institute.description}</p>
+                    ) : null}
+                    {view.institute.locationUrl ? (
+                      <a
+                        href={view.institute.locationUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 inline-block text-sm text-blue-600 underline-offset-2 hover:text-blue-700 hover:underline"
+                      >
+                        {view.institute.location}
+                      </a>
+                    ) : (
+                      <p className="mt-2 text-sm text-slate-600">{view.institute.location}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-700">
+                      {view.institute.phone && view.institute.phone !== "غير متوفر" ? (
+                        <div className="inline-flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-emerald-600" />
+                          {toWhatsAppLink(view.institute.phone) ? (
+                            <a
+                              href={toWhatsAppLink(view.institute.phone)!}
+                              target="_blank"
+                              rel="noreferrer"
+                              dir="ltr"
+                              className="text-emerald-700 underline-offset-2 hover:underline"
+                            >
+                              {view.institute.phone}
+                            </a>
+                          ) : (
+                            <span dir="ltr">{view.institute.phone}</span>
+                          )}
+                        </div>
+                      ) : null}
+                      {view.institute.email && view.institute.email !== "غير متوفر" ? (
+                        <div className="inline-flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-blue-600" />
+                          {toMailtoLink(view.institute.email) ? (
+                            <a href={toMailtoLink(view.institute.email)!} className="text-blue-700 underline-offset-2 hover:underline">
+                              {view.institute.email}
+                            </a>
+                          ) : (
+                            <span>{view.institute.email}</span>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          ) : null}
         </div>
       </section>
 
