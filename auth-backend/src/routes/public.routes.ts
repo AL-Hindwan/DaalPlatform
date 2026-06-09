@@ -8,6 +8,7 @@ const router = Router();
 
 // Publicly accessible halls endpoint
 router.get('/halls', trainerController.getHalls);
+router.get('/halls/:hallId', trainerController.getHallById);
 router.get('/halls/:hallId/availability', trainerController.getHallAvailability);
 
 // Publicly accessible institutes endpoint

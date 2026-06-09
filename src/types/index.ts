@@ -94,7 +94,7 @@ export interface Course {
   deactivatedAt?: Date;
 
   // UI-only helpers
-  deliveryType?: 'online' | 'in_person' | 'hybrid' | 'capacity_based';
+  deliveryType?: 'online' | 'in_person' | 'hybrid' | 'flexible';
   isCapacityBased?: boolean;
 
   category: string;

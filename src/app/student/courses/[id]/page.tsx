@@ -27,6 +27,7 @@ import {
 } from "lucide-react"
 import { studentService } from "@/lib/student-service"
 import { formatDate, formatTime, getFileUrl } from "@/lib/utils"
+import { HallDetailsModal } from "@/components/halls/HallDetailsModal"
 
 type SessionItem = {
   id: string
@@ -65,6 +66,7 @@ function normalizePhone(phone?: string | null) {
 
 function deliveryLabel(v?: string | null) {
   const value = String(v || "").trim().toLowerCase()
+  if (value === "flexible") return "يعتمد على المعهد لاحقاً"
   if (["online", "virtual", "remote", "zoom", "teams", "meet"].includes(value)) return "أونلاين"
   if (["in_person", "in-person", "onsite", "offline", "classroom", "physical"].includes(value)) return "حضوري"
   if (["hybrid", "blended"].includes(value)) return "هجين"
@@ -95,6 +97,8 @@ function StudentEnrolledCoursePageContent() {
   const [course, setCourse] = useState<any>(null)
   const [schedule, setSchedule] = useState<any[]>([])
   const [enrollmentStatus, setEnrollmentStatus] = useState<string | null>(null)
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [selectedHallId, setSelectedHallId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -150,6 +154,7 @@ function StudentEnrolledCoursePageContent() {
   const instructor = course?.instructor || course?.trainer || null
   const institute = course?.institute || null
   const roomLocationUrl = course?.room?.locationUrl || course?.locationUrl || null
+  const roomId = course?.roomId || course?.room?.id || null
   const hallName = course?.locationName || course?.room?.name || nextSession?.room?.name || nextSession?.location || null
   const heroMeetingLink = nextSession?.meetingLink || course?.meetingLink || null
   const joinSessionLink = nextSession?.meetingLink || course?.meetingLink || null
@@ -225,7 +230,17 @@ function StudentEnrolledCoursePageContent() {
                 {course.deliveryType !== "online" && hallName ? (
                   <div className="text-sm text-blue-100/95">
                     <span className="font-semibold">القاعة: </span>
-                    {roomLocationUrl ? (
+                    {roomId ? (
+                      <span 
+                        className="cursor-pointer underline decoration-white/50 underline-offset-2 hover:text-white transition-colors"
+                        onClick={() => {
+                          setSelectedHallId(roomId);
+                          setIsHallModalOpen(true);
+                        }}
+                      >
+                        {hallName}
+                      </span>
+                    ) : roomLocationUrl ? (
                       <a href={roomLocationUrl} target="_blank" rel="noreferrer" className="underline hover:text-white">
                         {hallName}
                       </a>
@@ -242,10 +257,22 @@ function StudentEnrolledCoursePageContent() {
                           <a href={heroMeetingLink} target="_blank" rel="noreferrer">دخول اللقاء</a>
                         </Button>
                       )}
-                      {course.deliveryType !== "online" && roomLocationUrl && (
-                        <Button asChild className="rounded-lg bg-blue-600 hover:bg-blue-700">
-                          <a href={roomLocationUrl} target="_blank" rel="noreferrer">عرض موقع القاعة</a>
-                        </Button>
+                      {course.deliveryType !== "online" && (
+                        roomId ? (
+                          <Button 
+                            className="rounded-lg bg-blue-600 hover:bg-blue-700"
+                            onClick={() => {
+                              setSelectedHallId(roomId);
+                              setIsHallModalOpen(true);
+                            }}
+                          >
+                            تفاصيل القاعة
+                          </Button>
+                        ) : roomLocationUrl ? (
+                          <Button asChild className="rounded-lg bg-blue-600 hover:bg-blue-700">
+                            <a href={roomLocationUrl} target="_blank" rel="noreferrer">عرض موقع القاعة</a>
+                          </Button>
+                        ) : null
                       )}
                     </>
                   )}
@@ -538,6 +565,12 @@ function StudentEnrolledCoursePageContent() {
           </div>
         </div>
       </div>
+
+      <HallDetailsModal
+        isOpen={isHallModalOpen}
+        onClose={setIsHallModalOpen}
+        hallId={selectedHallId}
+      />
     </section>
   )
 }

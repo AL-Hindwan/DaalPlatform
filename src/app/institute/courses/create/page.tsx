@@ -81,7 +81,7 @@ function CreateCoursePageInner() {
         categoryId: "",
         shortDescription: "",
         description: "",
-        deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
+        deliveryType: "", // in_person, online, hybrid, flexible (risk-free)
         price: "",
         minStudents: "",
         maxStudents: "",
@@ -476,7 +476,7 @@ function CreateCoursePageInner() {
 
             if (status === 'DRAFT' || status === 'PENDING_MINIMUM') {
                 // المسودة ودورات انتظار اكتمال العدد لا تحتاج مواعيد (إلا الحجز المرن قد يحتوي على تاريخ بداية)
-                startDate = courseData.deliveryType === 'capacity_based' ? courseData.startDate : '';
+                startDate = courseData.deliveryType === 'flexible' ? courseData.startDate : '';
                 endDate = '';
                 sessionsPayload = [];
             } else if (courseData.deliveryType === 'in_person') {
@@ -525,7 +525,7 @@ function CreateCoursePageInner() {
                         topic: s.topic || 'جلسة أونلاين'
                     };
                 });
-            } else if (courseData.deliveryType === 'capacity_based') {
+            } else if (courseData.deliveryType === 'flexible') {
                 if (status === 'ACTIVE' && !courseData.startDate) {
                     throw new Error("يجب تحديد تاريخ بداية الدورة للحجز المرن");
                 }
@@ -641,7 +641,7 @@ function CreateCoursePageInner() {
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
-        if (courseData.deliveryType === 'capacity_based') return !!courseData.startDate;
+        if (courseData.deliveryType === 'flexible') return !!courseData.startDate;
         return true; 
     }
     const shortDescriptionMax = 100
@@ -1143,8 +1143,8 @@ function CreateCoursePageInner() {
                                     <Building className="h-6 w-6 text-green-600" />
                                     <span className="font-bold">حضوري</span>
                                 </label>
-                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'capacity_based' ? 'border-purple-600 bg-purple-50' : ''}`}>
-                                    <RadioGroupItem value="capacity_based" className="sr-only" />
+                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'flexible' ? 'border-purple-600 bg-purple-50' : ''}`}>
+                                    <RadioGroupItem value="flexible" className="sr-only" />
                                     <Users className="h-6 w-6 text-purple-600" />
                                     <span className="font-bold">حجز مرن</span>
                                 </label>
@@ -1684,7 +1684,7 @@ function CreateCoursePageInner() {
                     )}
 
                     {/* Capacity Based Flow */}
-                    {courseData.deliveryType === 'capacity_based' && (
+                    {courseData.deliveryType === 'flexible' && (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>

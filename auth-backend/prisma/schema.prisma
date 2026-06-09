@@ -398,7 +398,7 @@ enum CourseStatus {
 
 enum BookingTrigger {
   IMMEDIATE
-  CAPACITY_BASED
+  FLEXIBLE
 }
 
 enum EnrollmentStatus {

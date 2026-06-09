@@ -497,7 +497,7 @@ async function main() {
             minStudents: 5,
             maxStudents: 25,
             status: 'ACTIVE',
-            bookingTrigger: 'CAPACITY_BASED',
+            bookingTrigger: 'FLEXIBLE',
             objectives: ['Build full-stack web applications', 'Master React and Node.js', 'Deploy to cloud platforms'],
             tags: ['web development', 'react', 'nodejs', 'mongodb'],
             trainerId: trainer1.id,

@@ -48,6 +48,7 @@ function relativeTime(isoDate: string) {
 }
 
 function sessionTypeLabel(type?: string) {
+  if (type === "flexible") return "يعتمد على المعهد لاحقاً"
   if (type === "online") return "أونلاين"
   if (type === "in_person") return "حضوري"
   if (type === "hybrid") return "هجين"

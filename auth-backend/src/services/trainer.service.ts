@@ -214,7 +214,7 @@ class TrainerService {
                     where: { status: { in: ['ACTIVE', 'PRELIMINARY', 'PRELIMINARY_APPROVED', 'PENDING_PAYMENT'] } },
                     select: { id: true },
                 },
-                sessions: { select: { id: true, type: true } },
+                sessions: { select: { id: true, type: true, room: { select: { id: true, name: true } } } },
             },
         });
 
@@ -261,9 +261,12 @@ class TrainerService {
                     price: Number(c.price),
                     minStudents: c.minStudents,
                     courseStatus: c.status, // 'ACTIVE' | 'PENDING_MINIMUM'
-                    deliveryType: c.sessions[0]?.type === 'ONLINE' ? 'online'
+                    deliveryType: c.bookingTrigger === 'FLEXIBLE' ? 'flexible'
+                        : c.sessions[0]?.type === 'ONLINE' ? 'online'
                         : c.sessions[0]?.type === 'IN_PERSON' ? 'in_person'
                             : c.sessions.length > 0 ? 'hybrid' : 'online',
+                    roomId: (c.sessions as any[]).find(s => s.type === 'IN_PERSON')?.room?.id || null,
+                    roomName: (c.sessions as any[]).find(s => s.type === 'IN_PERSON')?.room?.name || null,
                     startDate: c.startDate,
                     createdAt: c.createdAt,
                 };
@@ -498,9 +501,10 @@ class TrainerService {
             enrolledStudents: course._count.enrollments,
             category: course.category?.name || "-",
             categoryId: course.categoryId ?? '',
-            deliveryType: (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
+            deliveryType: (course as any).bookingTrigger === 'FLEXIBLE' ? 'flexible'
+                : (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
                 : (course as any).sessions?.[0]?.type === 'IN_PERSON' ? 'in_person'
-                    : (course as any).sessions?.length > 0 ? 'hybrid' : 'online',
+                : (course as any).sessions?.length > 0 ? 'hybrid' : 'online',
             hallId: (course as any).sessions?.[0]?.roomId ?? null,
             prerequisites: course.prerequisites ? course.prerequisites.split('\n').filter(Boolean) : [],
             objectives: course.objectives ?? [],
@@ -1150,7 +1154,8 @@ class TrainerService {
             objectives: course.objectives,
             tags: course.tags,
             locationUrl: (course as any).roomBookings?.[0]?.room?.locationUrl ?? null,
-            deliveryType: (course as any).sessions[0]?.type === 'ONLINE' ? 'online'
+            deliveryType: (course as any).bookingTrigger === 'FLEXIBLE' ? 'flexible'
+                : (course as any).sessions[0]?.type === 'ONLINE' ? 'online'
                 : (course as any).sessions[0]?.type === 'IN_PERSON' ? 'in_person'
                     : (course as any).sessions.length > 0 ? 'hybrid' : 'online',
             sessions: (course as any).sessions.map((s: any) => ({

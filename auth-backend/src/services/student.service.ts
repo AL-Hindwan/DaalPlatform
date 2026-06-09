@@ -631,7 +631,8 @@ class StudentService {
 
         // Derive delivery type and platform
         const primarySession = course.sessions[0];
-        const deliveryType = primarySession?.type === 'ONLINE' ? 'أونلاين'
+        const deliveryType = (course as any).bookingTrigger === 'FLEXIBLE' ? 'يعتمد على المعهد لاحقاً'
+            : primarySession?.type === 'ONLINE' ? 'أونلاين'
             : primarySession?.type === 'IN_PERSON' ? 'حضوري'
                 : course.sessions.length > 0 ? 'هجين' : 'أونلاين';
 
@@ -779,6 +780,7 @@ class StudentService {
                         category: { select: { name: true } },
                         trainer: { select: { id: true, name: true, avatar: true } },
                         staffTrainerIds: true,
+                        bookingTrigger: true,
                         sessions: { select: { id: true, type: true } }
                     }
                 }
@@ -798,7 +800,9 @@ class StudentService {
                 trainer: {
                     name: course.trainer?.name || ((course as any).staffTrainerIds?.length > 0 ? 'مدرب معهد' : 'مدرب'),
                 },
-                type: course.sessions[0]?.type === 'ONLINE' ? 'أونلاين' : (course.sessions.length > 0 ? 'حضوري' : 'أونلاين')
+                type: (course as any).bookingTrigger === 'FLEXIBLE' ? 'يعتمد على المعهد لاحقاً' 
+                    : course.sessions[0]?.type === 'ONLINE' ? 'أونلاين' 
+                    : (course.sessions.length > 0 ? 'حضوري' : 'أونلاين')
             };
         });
     }

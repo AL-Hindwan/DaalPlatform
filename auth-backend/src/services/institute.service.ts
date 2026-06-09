@@ -1751,8 +1751,8 @@ class InstituteService {
             }),
             trainers: staffTrainers,
             category: course.category?.name || "-",
-            deliveryType: (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
-                : (course as any).sessions?.[0]?.type === 'IN_PERSON' ? 'in_person'
+            deliveryType: course.bookingTrigger === 'FLEXIBLE' ? 'flexible'
+                : (course as any).sessions?.[0]?.type === 'ONLINE' ? 'online'
                     : (course as any).sessions?.length > 0 ? 'hybrid' : 'online',
             hallId: (course as any).sessions?.[0]?.roomId ?? null,
             prerequisites: course.prerequisites ? course.prerequisites.split('\n') : [],
@@ -1855,7 +1855,8 @@ class InstituteService {
 
         // If publishing (ACTIVE) with sessions payload, create sessions
         if (data.status?.toUpperCase() === 'ACTIVE' && Array.isArray(data.sessions) && data.sessions.length > 0) {
-            const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
+            const isFlexible = data.deliveryType === 'flexible';
+        const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
             const mappedSessions = data.sessions.map((s: any) => ({
                 startTime: new Date(`${s.date}T${s.startTime}`),
                 endTime: new Date(`${s.date}T${s.endTime}`),
@@ -2037,7 +2038,8 @@ class InstituteService {
         }
 
         // Create course
-        const sessionType = data.deliveryType === "online" ? "ONLINE" : "IN_PERSON";
+        const isFlexible = data.deliveryType === 'flexible';
+        const sessionType = data.deliveryType === 'online' ? 'ONLINE' : 'IN_PERSON';
 
         // Provide a robust fallback for creating nested sessions
         const mappedSessions = (data.sessions || []).map((session: any) => ({
@@ -2079,7 +2081,7 @@ class InstituteService {
                 maxStudents: Number(data.maxStudents),
                 minStudents: data.minStudents !== undefined && data.minStudents !== '' ? Number(data.minStudents) : undefined,
                 status: (data.status as any) || 'DRAFT',
-                bookingTrigger: data.status === 'PENDING_MINIMUM' ? 'CAPACITY_BASED' : (data.bookingTrigger || 'IMMEDIATE'),
+                bookingTrigger: isFlexible ? 'FLEXIBLE' : (data.bookingTrigger || 'IMMEDIATE'),
                 image: data.image,
                 staffTrainerIds: trainerIds,    // Store all IDs
                 trainerId: null,

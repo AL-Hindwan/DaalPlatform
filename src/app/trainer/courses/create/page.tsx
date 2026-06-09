@@ -81,7 +81,7 @@ export default function CreateCoursePage() {
         categoryId: "",
         shortDescription: "",
         description: "",
-        deliveryType: "", // in_person, online, hybrid, capacity_based (risk-free)
+        deliveryType: "", // in_person, online, hybrid, flexible (risk-free)
         price: "",
         minStudents: "",
         maxStudents: "",
@@ -480,7 +480,7 @@ export default function CreateCoursePage() {
                     };
                 });
             } else {
-                // capacity_based أو غير محدد — لا تواريخ
+                // flexible أو غير محدد — لا تواريخ
                 startDate = '';
                 endDate = '';
             }
@@ -581,7 +581,7 @@ export default function CreateCoursePage() {
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
-        return true; // capacity_based doesn't need location yet
+        return true; // flexible doesn't need location yet
     }
     const shortDescriptionMax = 100
     const shortDescriptionCount = courseData.shortDescription.length
@@ -1020,8 +1020,8 @@ export default function CreateCoursePage() {
                                     <Building className="h-6 w-6 text-green-600" />
                                     <span className="font-bold">حضوري</span>
                                 </label>
-                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'capacity_based' ? 'border-purple-600 bg-purple-50' : ''}`}>
-                                    <RadioGroupItem value="capacity_based" className="sr-only" />
+                                <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'flexible' ? 'border-purple-600 bg-purple-50' : ''}`}>
+                                    <RadioGroupItem value="flexible" className="sr-only" />
                                     <Users className="h-6 w-6 text-purple-600" />
                                     <span className="font-bold">حجز مرن</span>
                                 </label>

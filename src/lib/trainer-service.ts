@@ -51,6 +51,8 @@ export interface ExploreCourse {
     startDate: string;
     createdAt: string;
     deliveryType: string;
+    roomId?: string | null;
+    roomName?: string | null;
 }
 
 export interface ExploreCoursesData {
@@ -204,7 +206,7 @@ class TrainerService {
     }
 
     async getHallById(hallId: string): Promise<any> {
-        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/trainer/halls/${hallId}`);
+        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/public/halls/${hallId}`);
         return response.data.data;
     }
 

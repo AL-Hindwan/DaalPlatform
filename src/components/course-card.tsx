@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react"
-import { Users, Clock, ArrowRight, Heart } from "lucide-react"
+import { Users, Clock, ArrowRight, Heart, MapPin } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
@@ -31,6 +31,11 @@ export interface CourseCardProps {
     basePath?: string
     isFavorite?: boolean
     imageVariant?: "default" | "browse"
+    actionButton?: React.ReactNode;
+    extraContent?: ReactNode
+    secondaryAction?: ReactNode
+    primaryLabel?: string
+    primaryHref?: string
     hideStats?: boolean
     hidePrice?: boolean
     fullWidthButton?: boolean
@@ -38,10 +43,6 @@ export interface CourseCardProps {
     hideFavoriteButton?: boolean
     disableImageZoom?: boolean
     disableHoverEffects?: boolean
-    extraContent?: ReactNode
-    secondaryAction?: ReactNode
-    primaryLabel?: string
-    primaryHref?: string
     categoryPlacement?: "image" | "content"
     imageLeftBadge?: ReactNode
     cardClassName?: string
@@ -49,6 +50,9 @@ export interface CourseCardProps {
     categoryImagePosition?: "top-right" | "bottom-right"
     hideInstructorSection?: boolean
     courseStatus?: string
+    roomId?: string | null;
+    roomName?: string | null;
+    onRoomClick?: () => void;
 }
 
 export function CourseCard({
@@ -66,6 +70,11 @@ export function CourseCard({
     basePath = "/courses",
     isFavorite: initialIsFavorite = false,
     imageVariant = "default",
+    actionButton,
+    extraContent,
+    secondaryAction,
+    primaryLabel = "عرض التفاصيل",
+    primaryHref,
     hideStats = false,
     hidePrice = false,
     fullWidthButton = false,
@@ -73,10 +82,6 @@ export function CourseCard({
     hideFavoriteButton = false,
     disableImageZoom = false,
     disableHoverEffects = false,
-    extraContent,
-    secondaryAction,
-    primaryLabel = "عرض التفاصيل",
-    primaryHref,
     categoryPlacement = "image",
     imageLeftBadge,
     cardClassName = "",
@@ -84,6 +89,8 @@ export function CourseCard({
     categoryImagePosition = "bottom-right",
     hideInstructorSection = false,
     courseStatus,
+    roomName,
+    onRoomClick,
 }: CourseCardProps) {
     const { user } = useAuth() ?? {}
     const [isFavorite, setIsFavorite] = useState(initialIsFavorite)
@@ -203,6 +210,19 @@ export function CourseCard({
                             <Users className="w-3 h-3" />
                             <span>{studentsCount}</span>
                         </div>
+                        {roomName && (
+                            <div 
+                                className="flex items-center gap-1 bg-blue-50 text-blue-600 px-2 py-1 rounded-md cursor-pointer hover:bg-blue-100 transition-colors"
+                                onClick={(e) => { 
+                                    e.preventDefault(); 
+                                    e.stopPropagation(); 
+                                    if (onRoomClick) onRoomClick(); 
+                                }}
+                            >
+                                <MapPin className="w-3 h-3" />
+                                <span className="font-semibold underline decoration-blue-300 underline-offset-2">{roomName}</span>
+                            </div>
+                        )}
                     </div>
                 )}
 

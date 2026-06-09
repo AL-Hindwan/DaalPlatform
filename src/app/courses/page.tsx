@@ -21,6 +21,7 @@ import { CourseCard } from "@/components/course-card"
 import { trainerService, ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
+import { HallDetailsModal } from "@/components/halls/HallDetailsModal"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
@@ -35,10 +36,11 @@ function resolveImage(src: string | null): string {
 const deliveryTypesMap: Record<string, string> = {
   "أونلاين": "online",
   "حضوري": "in_person",
-  "حضور وأونلاين": "hybrid"
+  "حضور وأونلاين": "hybrid",
+  "يعتمد على المعهد لاحقاً": "flexible"
 }
 
-const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين"]
+const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين", "يعتمد على المعهد لاحقاً"]
 
 interface CoursesPageProps {
   basePath?: string
@@ -58,6 +60,9 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
 
   const { user } = useAuth() ?? {}
   const [wishlistIds, setWishlistIds] = useState<string[]>([])
+
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [selectedHallId, setSelectedHallId] = useState<string | null>(null)
 
   const fetchData = () => {
     setLoading(true)
@@ -290,6 +295,14 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
                     }
                     basePath={basePath}
                     isFavorite={wishlistIds.includes(course.id)}
+                    roomId={course.roomId}
+                    roomName={course.roomName}
+                    onRoomClick={() => {
+                      if (course.roomId) {
+                        setSelectedHallId(course.roomId)
+                        setIsHallModalOpen(true)
+                      }
+                    }}
                   />
                 ))}
               </div>
@@ -297,6 +310,11 @@ export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps)
           </div>
         </div>
       </div>
+      <HallDetailsModal 
+        isOpen={isHallModalOpen} 
+        onClose={setIsHallModalOpen} 
+        hallId={selectedHallId} 
+      />
     </div>
 
   )

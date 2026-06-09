@@ -150,7 +150,7 @@ export function CourseDetailsLayout({
                 </div>
                 <div className="flex flex-row-reverse items-center justify-end gap-2 text-right">
                   <Globe className="h-4 w-4 text-blue-200" />
-                  <span>{courseData.deliveryType === "online" ? "أونلاين" : "حضوري"}</span>
+                  <span>{courseData.deliveryType === "flexible" ? "يعتمد على المعهد لاحقاً" : courseData.deliveryType === "online" ? "أونلاين" : courseData.deliveryType === "hybrid" ? "هجين" : "حضوري"}</span>
                 </div>
               </div>
 

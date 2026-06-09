@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input"
 import { useAuth } from "@/contexts/auth-context"
 import { studentService } from "@/lib/student-service"
 import { trainerService, type CourseDetail } from "@/lib/trainer-service"
+import { HallDetailsModal } from "@/components/halls/HallDetailsModal"
 import {
   ArrowRight,
   BookOpen,
@@ -121,6 +122,7 @@ function formatArabicTime(value?: string | null) {
 }
 
 function deliveryLabel(value?: string | null) {
+  if (value === "flexible") return "يعتمد على المعهد لاحقاً"
   if (value === "online") return "أونلاين"
   if (value === "in_person") return "حضوري"
   if (value === "hybrid") return "هجين"
@@ -297,6 +299,9 @@ export default function TrainerExploreCourseDetailsPage() {
   const [course, setCourse] = useState<CourseDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
+  const [selectedHallId, setSelectedHallId] = useState<string | null>(null)
   const [isFavorite, setIsFavorite] = useState(false)
   const [registerOpen, setRegisterOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
@@ -567,6 +572,7 @@ export default function TrainerExploreCourseDetailsPage() {
       endDate: actualEndDate,
       delivery,
       deliveryDetail,
+      roomId: course.deliveryType === "in_person" ? (firstInPersonSession?.room?.id || null) : null,
       instructor: course.instructor,
       trainerName,
       trainerPhone,
@@ -641,7 +647,9 @@ export default function TrainerExploreCourseDetailsPage() {
         icon: Globe,
         label: view.deliveryDetail && view.deliveryDetail !== "غير محدد" && !(view.courseStatus === "PENDING_MINIMUM" || view.courseStatus === "DRAFT")
           ? `${view.delivery}: ${view.deliveryDetail}`
-          : view.delivery
+          : view.delivery,
+        isRoom: !!view.roomId,
+        roomId: view.roomId,
       }
       : null,
     view.durationWeeks > 0 ? { icon: Clock, label: formatWeeksLabel(view.durationWeeks) } : null,
@@ -739,7 +747,19 @@ export default function TrainerExploreCourseDetailsPage() {
                     return (
                       <div key={item.label} className="inline-flex items-center gap-1.5">
                         <Icon className="h-3.5 w-3.5 shrink-0 text-white/80" />
-                        <span>{item.label}</span>
+                        {(item as any).isRoom ? (
+                          <span 
+                            className="cursor-pointer underline decoration-white/50 underline-offset-2 hover:text-white transition-colors"
+                            onClick={() => {
+                              setSelectedHallId((item as any).roomId);
+                              setIsHallModalOpen(true);
+                            }}
+                          >
+                            {item.label}
+                          </span>
+                        ) : (
+                          <span>{item.label}</span>
+                        )}
                         {index < heroMetaItems.length - 1 ? <span aria-hidden="true" className="mx-1 text-white/50">·</span> : null}
                       </div>
                     )
@@ -1449,6 +1469,11 @@ export default function TrainerExploreCourseDetailsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <HallDetailsModal 
+        isOpen={isHallModalOpen} 
+        onClose={setIsHallModalOpen} 
+        hallId={selectedHallId} 
+      />
     </div>
   )
 }
