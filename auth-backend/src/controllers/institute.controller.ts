@@ -390,6 +390,14 @@ class InstituteController {
         } catch (error: any) { return sendError(res, error.message, 400); }
     }
 
+    async validateHallUpdate(req: AuthRequest, res: Response, _next: NextFunction) {
+        try {
+            if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);
+            const data = await instituteService.validateInstituteHallUpdate(req.user.userId, req.params.hallId, req.body);
+            return sendSuccess(res, 'تم التحقق من التأثيرات', data);
+        } catch (error: any) { return sendError(res, error.message, 400); }
+    }
+
     async updateHall(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             if (req.user?.role !== 'INSTITUTE_ADMIN') return sendError(res, 'غير مصرح لك بالوصول', 403);

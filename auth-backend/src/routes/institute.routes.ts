@@ -39,6 +39,7 @@ router.put('/courses/:id/trainer', instituteController.changeTrainer);
 router.get('/halls', instituteController.getHalls);
 router.get('/halls/:hallId/availability', instituteController.getHallAvailability);
 router.post('/halls', upload.single('image'), instituteController.addHall);
+router.post('/halls/:hallId/validate-update', instituteController.validateHallUpdate);
 router.patch('/halls/:hallId', upload.single('image'), instituteController.updateHall);
 router.delete('/halls/:hallId', instituteController.removeHall);
 

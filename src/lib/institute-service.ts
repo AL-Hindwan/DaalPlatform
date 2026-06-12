@@ -202,6 +202,11 @@ class InstituteService {
         return response.data.data;
     }
 
+    async validateHallUpdate(hallId: string, data: any): Promise<{affectedCourses: number, affectedBookings: number}> {
+        const response = await apiClient.post<{ success: boolean; message: string; data: any }>(`/api/institute/halls/${hallId}/validate-update`, data);
+        return response.data.data;
+    }
+
     async addHall(data: FormData): Promise<any> {
         const response = await apiClient.post<{ success: boolean; message: string; data: any }>('/api/institute/halls', data, {
             headers: { 'Content-Type': 'multipart/form-data' }

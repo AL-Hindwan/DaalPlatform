@@ -501,7 +501,7 @@ export class AdminController {
                 return sendError(res, 'غير مصرح لك بالوصول', 403);
             }
             const { id } = req.params;
-            const adminId = req.user.id;
+            const adminId = req.user.userId;
             const result = await adminService.updateHall(id, req.body, adminId);
             return sendSuccess(res, result.message);
         } catch (error: any) {

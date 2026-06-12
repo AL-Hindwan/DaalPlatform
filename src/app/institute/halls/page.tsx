@@ -24,7 +24,7 @@ interface BlackoutPeriod {
 }
 
 interface HallAvailability {
-  slots: { day: string; startTime: string; endTime: string }[]
+  slots: { day: string; startTime: string; endTime: string; isUsed?: boolean }[]
   blackoutPeriods: BlackoutPeriod[]
 }
 
@@ -243,6 +243,7 @@ export default function InstituteHallsPage() {
   const [pendingBookingsCount, setPendingBookingsCount] = useState(0)
   const [bookingsStats, setBookingsStats] = useState({ total: 0, pending: 0, approved: 0 })
   const [hallToDeleteId, setHallToDeleteId] = useState<string | null>(null)
+  const [impactData, setImpactData] = useState<{ affectedCourses: number, affectedBookings: number } | null>(null)
 
   const loadHalls = async () => {
     setLoading(true)
@@ -381,6 +382,28 @@ export default function InstituteHallsPage() {
       return
     }
 
+    if (!isCreating) {
+      setActionLoading(true)
+      try {
+        const impact = await instituteService.validateHallUpdate(editingHall.id, { availability: JSON.stringify(editingHall.availability) });
+        if (impact.affectedCourses > 0 || impact.affectedBookings > 0) {
+          setImpactData(impact);
+          setActionLoading(false);
+          return;
+        }
+      } catch (e: any) {
+        toast.error("فشل التحقق من التأثيرات");
+        setActionLoading(false);
+        return;
+      }
+      setActionLoading(false);
+    }
+    
+    executeSave();
+  }
+
+  const executeSave = async () => {
+    if (!editingHall) return
     setActionLoading(true)
     try {
       const payload = new FormData()
@@ -895,7 +918,11 @@ export default function InstituteHallsPage() {
                         <div className="space-y-3">
                           {editingForm.availability.slots.map((period, index) => (
                             <div key={index} className="flex items-center gap-2">
+                              {period.isUsed && (
+                                <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded-md border whitespace-nowrap">مستخدمة</span>
+                              )}
                               <Select
+                                disabled={period.isUsed}
                                 value={period.day}
                                 onValueChange={(val) => {
                                   setEditingHall(prev => {
@@ -925,7 +952,7 @@ export default function InstituteHallsPage() {
                               </Select>
                               <Input
                                 type="time"
-                                className="h-10 w-24 rounded-[6.5px] text-center"
+                                className="h-10 w-24 rounded-[6.5px] text-center disabled:opacity-50"
                                 value={period.startTime}
                                 onChange={(e) => {
                                   setEditingHall(prev => {
@@ -954,7 +981,8 @@ export default function InstituteHallsPage() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                className="h-10 w-10 shrink-0 rounded-[6.5px] text-red-500 hover:bg-red-50 hover:text-red-600"
+                                disabled={period.isUsed}
+                                className="h-10 w-10 shrink-0 rounded-[6.5px] text-red-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
                                 onClick={() => {
                                   setEditingHall(prev => {
                                     if (!prev) return prev;
@@ -1057,6 +1085,31 @@ export default function InstituteHallsPage() {
                 {actionLoading ? "جاري الحذف..." : "حذف القاعة"}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!impactData} onOpenChange={(open) => { if (!open) setImpactData(null) }}>
+        <DialogContent dir="rtl" className="max-w-md rounded-[6.5px]">
+          <DialogHeader>
+            <DialogTitle className="text-red-600 flex items-center gap-2 font-bold">
+              تحذير: تعارض مع حجوزات أو دورات
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2 space-y-4 text-sm">
+            <p className="text-slate-700 leading-relaxed">
+              لا يمكن حفظ التعديلات على فترات الإتاحة لأن التعديل (تقليص أو حذف) يتعارض مع الكيانات التالية:
+            </p>
+            <ul className="list-disc list-inside space-y-1.5 font-semibold text-slate-800 bg-red-50 p-4 rounded-lg">
+              {impactData?.affectedCourses ? <li>{impactData.affectedCourses} دورة نشطة/مستقبلية</li> : null}
+              {impactData?.affectedBookings ? <li>{impactData.affectedBookings} حجز قاعة نشط/مستقبلي</li> : null}
+            </ul>
+            <p className="text-slate-500 text-xs leading-relaxed">
+              يرجى مراجعة الفترات والتأكد من عدم تقليص أوقات مستخدمة حالياً. يمكنك إضافة فترات جديدة أو توسيع الفترات الحالية بحرية.
+            </p>
+          </div>
+          <div className="flex justify-end pt-2 border-t">
+            <Button onClick={() => setImpactData(null)} variant="outline" className="rounded-[6.5px]">تعديل الفترات</Button>
           </div>
         </DialogContent>
       </Dialog>

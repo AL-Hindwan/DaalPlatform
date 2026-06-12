@@ -1261,13 +1261,43 @@ class InstituteService {
 
         const halls = await prisma.room.findMany({
             where: { instituteId: institute.id, isActive: true },
+            include: {
+                bookings: { where: { status: { notIn: ['REJECTED', 'CANCELLED'] }, endDate: { gte: new Date() } } },
+                sessions: { where: { status: { not: 'CANCELLED' }, startTime: { gte: new Date() } } }
+            },
             orderBy: { name: "asc" },
         });
 
-        return halls.map(hall => ({
-            ...hall,
-            institute: { name: institute.name }
-        }));
+        const dayMap: Record<string, number> = {
+            'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3, 'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+        };
+
+        return halls.map(hall => {
+            const avail = hall.availability as any;
+            const slots = (avail?.slots || []).map((slot: any) => {
+                 const targetDay = dayMap[slot.day];
+                 const isUsed = hall.sessions.some(s => s.startTime.getDay() === targetDay) || 
+                                hall.bookings.some(b => {
+                                   if (b.bookingMode === 'UNIFIED_TIME' && b.selectedDays.includes(slot.day as any)) return true;
+                                   // For custom time, just approximate by checking if it spans this day
+                                   const cur = new Date(b.startDate);
+                                   while (cur <= b.endDate) {
+                                       if (cur.getDay() === targetDay) return true;
+                                       cur.setDate(cur.getDate() + 1);
+                                   }
+                                   return false;
+                                });
+                 return { ...slot, isUsed };
+            });
+
+            return {
+                ...hall,
+                availability: { ...avail, slots },
+                institute: { name: institute.name },
+                bookings: undefined,
+                sessions: undefined
+            };
+        });
     }
 
     /**
@@ -1413,6 +1443,147 @@ class InstituteService {
                 });
     }
 
+    async validateInstituteHallUpdate(userId: string, hallId: string, data: any) {
+        const institute = await prisma.institute.findUnique({ where: { userId } });
+        if (!institute) throw new Error("لم يتم العثور على المعهد");
+
+        const room = await prisma.room.findFirst({
+            where: { id: hallId, instituteId: institute.id },
+            include: {
+                bookings: {
+                    where: { status: { notIn: ['REJECTED', 'CANCELLED'] }, endDate: { gte: new Date() } }
+                },
+                sessions: {
+                    where: { status: { not: 'CANCELLED' }, startTime: { gte: new Date() } }
+                }
+            }
+        });
+        if (!room) throw new Error("لم يتم العثور على القاعة");
+
+        const oldAvailSlots = typeof room.availability === 'object' && room.availability ? (room.availability as any).slots || [] : [];
+        let newAvailSlots: any[] = [];
+        if (typeof data.availability === 'string') {
+            try { newAvailSlots = JSON.parse(data.availability).slots || []; } catch {}
+        } else {
+            newAvailSlots = data.availability?.slots || [];
+        }
+
+        console.log("Validation Debug - oldAvailSlots:", oldAvailSlots);
+        console.log("Validation Debug - newAvailSlots:", newAvailSlots);
+
+        if (newAvailSlots.length === 0) {
+            return { affectedCourses: 0, affectedBookings: 0 };
+        }
+
+        let isReduction = false;
+        if (oldAvailSlots.length === 0 && newAvailSlots.length > 0) {
+            isReduction = true;
+        } else {
+            for (const oldSlot of oldAvailSlots) {
+                const oldStartMin = parseInt(oldSlot.startTime.split(':')[0]) * 60 + parseInt(oldSlot.startTime.split(':')[1]);
+                const oldEndMin = parseInt(oldSlot.endTime.split(':')[0]) * 60 + parseInt(oldSlot.endTime.split(':')[1]);
+                let covered = false;
+                for (const newSlot of newAvailSlots) {
+                    if (newSlot.day !== oldSlot.day) continue;
+                    const newStartMin = parseInt(newSlot.startTime.split(':')[0]) * 60 + parseInt(newSlot.startTime.split(':')[1]);
+                    const newEndMin = parseInt(newSlot.endTime.split(':')[0]) * 60 + parseInt(newSlot.endTime.split(':')[1]);
+                    if (newStartMin <= oldStartMin && newEndMin >= oldEndMin) {
+                        covered = true;
+                        break;
+                    }
+                }
+                if (!covered) {
+                    console.log("Validation Debug - slot not covered:", oldSlot);
+                    isReduction = true;
+                    break;
+                }
+            }
+        }
+
+        console.log("Validation Debug - isReduction:", isReduction);
+
+        if (!isReduction) {
+            return { affectedCourses: 0, affectedBookings: 0 };
+        }
+
+        const affectedCourses = new Set<string>();
+        const affectedBookings = new Set<string>();
+
+        const dayMap: Record<string, number> = {
+            'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3, 'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+        };
+
+        const getASTDate = (d: Date) => new Date(d.getTime() + 3 * 60 * 60 * 1000);
+
+        const checkTimeFit = (astDay: number, astStart: Date, astEnd: Date) => {
+            const startMin = astStart.getUTCHours() * 60 + astStart.getUTCMinutes();
+            const endMin = astEnd.getUTCHours() * 60 + astEnd.getUTCMinutes();
+
+            for (const slot of newAvailSlots) {
+                if (dayMap[slot.day] !== astDay) continue;
+                
+                const sSplit = slot.startTime.split(':');
+                const slotStart = parseInt(sSplit[0]) * 60 + parseInt(sSplit[1]);
+                const eSplit = slot.endTime.split(':');
+                const slotEnd = parseInt(eSplit[0]) * 60 + parseInt(eSplit[1]);
+
+                if (startMin >= slotStart && endMin <= slotEnd) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        for (const session of room.sessions) {
+            const astStart = getASTDate(session.startTime);
+            const astEnd = getASTDate(session.endTime);
+            const sessionDay = astStart.getUTCDay();
+            if (!checkTimeFit(sessionDay, astStart, astEnd)) {
+                if (session.courseId) affectedCourses.add(session.courseId);
+                if (session.roomBookingId) affectedBookings.add(session.roomBookingId);
+            }
+        }
+
+        for (const booking of room.bookings) {
+            let fits = true;
+            const current = new Date(booking.startDate);
+            current.setUTCHours(0,0,0,0);
+            const end = new Date(booking.endDate);
+            end.setUTCHours(23,59,59,999);
+
+            while (current <= end) {
+                const astCurrent = getASTDate(current);
+                const day = astCurrent.getUTCDay();
+                if (booking.bookingMode === 'UNIFIED_TIME' && booking.selectedDays.length > 0) {
+                    const selectedDaysNumbers = booking.selectedDays.map((d:string) => dayMap[d]);
+                    if (!selectedDaysNumbers.includes(day)) {
+                        current.setUTCDate(current.getUTCDate() + 1);
+                        continue;
+                    }
+                }
+
+                const astDefStart = getASTDate(booking.defaultStartTime);
+                const astDefEnd = getASTDate(booking.defaultEndTime);
+
+                if (!checkTimeFit(day, astDefStart, astDefEnd)) {
+                    fits = false;
+                    break;
+                }
+                current.setUTCDate(current.getUTCDate() + 1);
+            }
+
+            if (!fits) {
+                affectedBookings.add(booking.id);
+                if (booking.courseId) affectedCourses.add(booking.courseId);
+            }
+        }
+
+        return {
+            affectedCourses: affectedCourses.size,
+            affectedBookings: affectedBookings.size
+        };
+    }
+
     /**
      * Update an existing hall
      */
@@ -1441,19 +1612,25 @@ class InstituteService {
         });
         if (!hall) throw new Error("لم يتم العثور على القاعة");
 
-        
-                auditService.logAction({
-                    action: 'UPDATE',
-                    entityName: 'Room',
-                    entityId: 'system_log', // Default if ID is complex to resolve
-                    description: 'تعديل قاعة',
-                    performedBy: userId
-                }).catch(e => console.error(e));
+        if (data.availability !== undefined) {
+            const validation = await this.validateInstituteHallUpdate(userId, hallId, { availability: data.availability });
+            if (validation.affectedCourses > 0 || validation.affectedBookings > 0) {
+                throw new Error("لا يمكن حفظ التعديلات بسبب تأثيرها على دورات أو حجوزات نشطة. يرجى مراجعة الفترات.");
+            }
+        }
+
+        auditService.logAction({
+            action: 'UPDATE',
+            entityName: 'Room',
+            entityId: hallId, // Store actual ID
+            description: `تعديل قاعة. القيم القديمة: ${JSON.stringify({ capacity: hall.capacity, pricePerHour: hall.pricePerHour, availability: hall.availability })}. القيم الجديدة: ${JSON.stringify({ capacity: data.capacity, pricePerHour: data.pricePerHour, availability: data.availability })}`,
+            performedBy: userId
+        }).catch(e => console.error(e));
 
         return prisma.room.update({
-                    where: { id: hallId },
-                    data,
-                });
+            where: { id: hallId },
+            data,
+        });
     }
 
     /**
