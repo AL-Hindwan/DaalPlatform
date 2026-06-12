@@ -173,7 +173,7 @@ export function CourseCard({
                 ) : courseStatus === "ACTIVE" ? (
                     <div className="absolute top-3 right-3 z-10">
                         <Badge className="bg-emerald-500/95 text-white hover:bg-emerald-600 backdrop-blur-sm shadow-sm border border-emerald-300/30">
-                            مؤكدة الانعقاد
+                            مستمرة
                         </Badge>
                     </div>
                 ) : null}

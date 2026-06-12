@@ -16,11 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, AlertTriangle, Banknote, Lock, Loader2, Landmark, Heart, BookOpen, Target, ListChecks, Tags, Lightbulb } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, AlertTriangle, Banknote, Lock, Loader2, Landmark, Heart, BookOpen, Target, ListChecks, Tags, Lightbulb, Bell } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
-import { formatNumber } from "@/lib/utils"
-import { getFileUrl } from "@/lib/utils"
+import { formatNumber, getFileUrl } from "@/lib/utils"
+import { getCourseEditPermissions } from "@/lib/course-edit-permissions"
+import { CourseStatusBanner } from "@/components/courses/CourseStatusBanner"
+import { BookingSectionLocked } from "@/components/courses/BookingSectionLocked"
 
 
 const platforms = [
@@ -61,6 +63,11 @@ function CreateCoursePageInner() {
     const [lastDraftSavedAt, setLastDraftSavedAt] = useState<Date | null>(null)
     const [instituteIds, setInstituteIds] = useState<string[]>([])
     const [instituteName, setInstituteName] = useState<string>("")
+
+    // Course Lifecycle State (used in Edit Mode)
+    const [courseStatus, setCourseStatus] = useState<string>('DRAFT')
+    const [enrolledCount, setEnrolledCount] = useState(0)
+    const [minStudentsCount, setMinStudentsCount] = useState(1)
 
     // Reference Data State
     const [categories, setCategories] = useState<{ id: string, name: string }[]>([])
@@ -237,6 +244,11 @@ function CreateCoursePageInner() {
                         tags: existing.tags || [],
                         startDate: existing.startDate ? new Date(existing.startDate).toISOString().split('T')[0] : "",
                     })
+
+                    // Store lifecycle state
+                    setCourseStatus(existing.status || 'DRAFT')
+                    setEnrolledCount(existing.enrolledCount ?? 0)
+                    setMinStudentsCount(Number(existing.minStudents) || 1)
 
                     if (existing.trainers?.length > 0) {
                         setSelectedTrainerIds(existing.trainers.map((t: any) => t.id))
@@ -460,6 +472,59 @@ function CreateCoursePageInner() {
         return result || 'جلسة حضورية'
     }
 
+    /**
+     * نشر وإعلام الطلاب (pending_min_ready → ACTIVE)
+     */
+    const handleActivateCourse = async () => {
+        try {
+            setIsSubmitting(true)
+
+            if (courseData.deliveryType === 'online') {
+                const validSessions = onlineSessions.filter(s => s.date && s.startTime)
+                if (validSessions.length === 0) {
+                    toast.error('يجب إضافة جلسة واحدة على الأقل مع تحديد التاريخ والوقت')
+                    setIsSubmitting(false)
+                    return
+                }
+            } else if (courseData.deliveryType === 'in_person') {
+                if (selectedSessions.length === 0) {
+                    toast.error('يجب اختيار جلسة واحدة على الأقل من التقويم')
+                    setIsSubmitting(false)
+                    return
+                }
+                if (!isOwnInstituteHall && !paymentFile) {
+                    toast.error('يجب إرفاق سند الدفع لحجز القاعة')
+                    setIsSubmitting(false)
+                    return
+                }
+            } else if (courseData.deliveryType === 'flexible') {
+                if (!courseData.startDate) {
+                    toast.error('يجب تحديد تاريخ بداية الدورة للحجز المرن')
+                    setIsSubmitting(false)
+                    return
+                }
+            } else if (!courseData.deliveryType) {
+                toast.error('يجب اختيار نوع التنفيذ أولاً')
+                setIsSubmitting(false)
+                return
+            }
+
+            // 1. Save changes (without changing status yet)
+            await handleSubmit('PENDING_MINIMUM')
+
+            // 2. Call /activate to trigger transaction (move students, send notifications, status=ACTIVE)
+            await instituteService.activateCourse(editCourseId)
+
+            toast.success('🎉 تم نشر الدورة وإعلام الطلاب بنجاح!')
+            router.push('/institute/courses')
+        } catch (err: any) {
+            const backendMessage = err?.response?.data?.message
+            toast.error(backendMessage || err?.message || 'حدث خطأ أثناء تفعيل الدورة')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
     // --- Submission Logic ---
     const handleSubmit = async (status: 'DRAFT' | 'ACTIVE' | 'PENDING_MINIMUM') => {
         try {
@@ -637,7 +702,7 @@ function CreateCoursePageInner() {
     }
 
     // --- Validation ---
-    const isInfoValid = courseData.title && courseData.categoryId && selectedTrainerIds.length > 0 && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents);
+    const isInfoValid = courseData.title && courseData.categoryId && selectedTrainerIds.length > 0 && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents) && (imageFile || imagePreview);
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
@@ -651,6 +716,16 @@ function CreateCoursePageInner() {
     const selectedCategoryName = categories.find((c) => c.id === courseData.categoryId)?.name || "الفئة"
     const previewTitle = courseData.title.trim() || "عنوان الدورة سيظهر هنا"
     const previewShortDesc = courseData.shortDescription.trim() || "وصف الدورة المختصر سيظهر هنا"
+
+    // --- Permissions ---
+    const effectiveStatus = isEditMode ? courseStatus : 'DRAFT'
+    const permissions = getCourseEditPermissions(effectiveStatus, enrolledCount, minStudentsCount, courseData.deliveryType)
+    const isFieldLocked = (field: string) => 
+        isEditMode && (
+            permissions.isReadOnly || 
+            permissions.lockedCourseInfoFields.includes('*') || 
+            permissions.lockedCourseInfoFields.includes(field)
+        )
 
     if (loading) {
         return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -671,6 +746,15 @@ function CreateCoursePageInner() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{isEditMode ? "تعديل الدورة التدريبية" : "إنشاء دورة تدريبية جديدة"}</h1>
                 <p className="text-gray-600">{isEditMode ? "اتبع الخطوات التالية لتحديث بيانات الدورة ونشر التغييرات" : "اتبع الخطوات التالية لإنشاء ونشر دورتك التدريبية"}</p>
             </div>
+
+            {/* شريط حالة الدورة */}
+            {isEditMode && (
+                <CourseStatusBanner
+                    state={permissions.state}
+                    enrolledCount={enrolledCount}
+                    minStudents={minStudentsCount}
+                />
+            )}
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
                 <div className="w-full rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -737,10 +821,12 @@ function CreateCoursePageInner() {
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">عنوان الدورة <span className="text-red-500">*</span></Label>
                                                 <Input value={courseData.title} onChange={e => setCourseData({ ...courseData, title: e.target.value })} placeholder="مثال: تعلم React" />
+                                                {showInfoErrors && !courseData.title.trim() && <p className="text-xs text-red-500 text-right mt-1">يرجى إدخال عنوان الدورة.</p>}
                                             </div>
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">الفئة <span className="text-red-500">*</span></Label>
                                                 <Select
+                                                    disabled={isFieldLocked('categoryId')}
                                                     value={courseData.categoryId}
                                                     onValueChange={v => {
                                                         if (v === '__add_new__') setIsAddingCategory(true)
@@ -839,7 +925,7 @@ function CreateCoursePageInner() {
                                         <div className="space-y-2.5 lg:order-1" dir="rtl">
                                             <Label className="font-semibold">صورة الدورة <span className="text-red-500">*</span></Label>
                                             <div className="w-full">
-                                                <div className="relative h-[188px] w-full max-w-[420px] cursor-pointer overflow-hidden rounded-md border-2 border-dashed border-gray-300 bg-gray-50 transition-colors hover:bg-gray-100 md:h-[196px]" onClick={() => fileInputRef.current?.click()}>
+                                                <div className="relative h-[188px] w-full max-w-[420px] cursor-pointer overflow-hidden rounded-md border-2 border-dashed border-gray-300 bg-gray-50 transition-colors hover:bg-gray-100 md:h-[196px]" onClick={() => !isFieldLocked('image') && fileInputRef.current?.click()}>
                                                     {imagePreview ? <Image src={imagePreview} alt="Course Preview" fill unoptimized className="object-cover object-center" /> : (
                                                         <div className="flex h-full flex-col items-center justify-center text-gray-400 text-center px-3">
                                                             <Plus className="mb-2 h-8 w-8" />
@@ -850,11 +936,12 @@ function CreateCoursePageInner() {
                                                 </div>
                                             </div>
                                             <div className="pt-1">
-                                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} />
+                                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageChange} disabled={isFieldLocked('image')} />
                                                 <div className="flex items-center gap-2">
-                                                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>اختر الصورة</Button>
-                                                    {imageFile && <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => { setImageFile(null); setImagePreview(""); }}>إزالة</Button>}
+                                                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isFieldLocked('image')}>اختر الصورة</Button>
+                                                    {(imageFile || imagePreview) && !isFieldLocked('image') && <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => { setImageFile(null); setImagePreview(""); }}>إزالة</Button>}
                                                 </div>
+                                                {showInfoErrors && !imageFile && !imagePreview && <p className="text-xs text-red-500 mt-2 text-right">يرجى رفع صورة الدورة.</p>}
                                             </div>
                                         </div>
                                     </div>
@@ -950,6 +1037,7 @@ function CreateCoursePageInner() {
                                         <Label>أقصى عدد مقاعد <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="number"
+                                            disabled={isFieldLocked('maxStudents')}
                                             value={courseData.maxStudents}
                                             onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })}
                                             onKeyDown={preventNumberSteppers}
@@ -961,6 +1049,7 @@ function CreateCoursePageInner() {
                                         <Label>أقل عدد مقاعد <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="number"
+                                            disabled={isFieldLocked('minStudents')}
                                             value={courseData.minStudents}
                                             onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })}
                                             onKeyDown={preventNumberSteppers}
@@ -973,6 +1062,7 @@ function CreateCoursePageInner() {
                                         <Input
                                             type="text"
                                             inputMode="numeric"
+                                            disabled={isFieldLocked('price')}
                                             value={formatNumberWithCommas(courseData.price)}
                                             onChange={e => setCourseData({ ...courseData, price: e.target.value.replace(/[^\d]/g, "") })}
                                             onKeyDown={preventNumberSteppers}
@@ -1102,7 +1192,7 @@ function CreateCoursePageInner() {
 
                     <div className="mt-4 flex items-center justify-between pt-4 xl:ml-auto xl:w-[72%]">
                         <div className="flex items-center gap-3">
-                            {Number(courseData.minStudents) > 1 && (
+                            {(!isEditMode || permissions.showPublishCourse) && Number(courseData.minStudents) > 1 && (
                                 <Button variant="outline" onClick={() => handleSubmit('PENDING_MINIMUM')} disabled={isSubmitting || !isInfoValid} className="gap-2 border-purple-300 text-purple-700 hover:border-purple-400 hover:bg-purple-50">
                                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} نشر بانتظار الحد الأدنى
                                 </Button>
@@ -1121,9 +1211,18 @@ function CreateCoursePageInner() {
                                 التالي<ArrowLeft className="mr-2 h-4 w-4" />
                             </Button>
                         </div>
-                        <Button variant="outline" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting} className="text-gray-700">
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ كمسودة
-                        </Button>
+                        <div className="flex gap-2">
+                            {(!isEditMode || permissions.showSaveAsDraft) && (
+                                <Button variant="outline" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting} className="text-gray-700">
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ كمسودة
+                                </Button>
+                            )}
+                            {isEditMode && permissions.showSaveChanges && (
+                                <Button onClick={() => handleSubmit(courseStatus as any)} disabled={isSubmitting || !isInfoValid}>
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ التغييرات
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </TabsContent>
 
@@ -1132,7 +1231,7 @@ function CreateCoursePageInner() {
                     <Card>
                         <CardHeader><CardTitle>طريقة الانعقاد</CardTitle></CardHeader>
                         <CardContent>
-                            <RadioGroup value={courseData.deliveryType} onValueChange={v => setCourseData({ ...courseData, deliveryType: v })} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <RadioGroup disabled={isFieldLocked('deliveryType')} value={courseData.deliveryType} onValueChange={v => setCourseData({ ...courseData, deliveryType: v })} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50' : ''}`}>
                                     <RadioGroupItem value="online" className="sr-only" />
                                     <Globe className="h-6 w-6 text-blue-600" />
@@ -1153,7 +1252,7 @@ function CreateCoursePageInner() {
                     </Card>
 
                     {/* In-Person Flow */}
-                    {courseData.deliveryType === 'in_person' && (
+                    {courseData.deliveryType === 'in_person' && (!isEditMode || permissions.canEditBookingSection) && (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader><CardTitle>اختيار القاعة</CardTitle></CardHeader>
@@ -1601,7 +1700,7 @@ function CreateCoursePageInner() {
                     )}
 
                     {/* Online Flow */}
-                    {courseData.deliveryType === 'online' && (
+                    {courseData.deliveryType === 'online' && (!isEditMode || permissions.canEditBookingSection) && (
                         <div className="space-y-6">
                             {/* Platform & Meeting Link */}
                             <Card>
@@ -1684,7 +1783,7 @@ function CreateCoursePageInner() {
                     )}
 
                     {/* Capacity Based Flow */}
-                    {courseData.deliveryType === 'flexible' && (
+                    {courseData.deliveryType === 'flexible' && (!isEditMode || permissions.canEditBookingSection) && (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader>
@@ -1702,12 +1801,79 @@ function CreateCoursePageInner() {
                         </div>
                     )}
 
+                    {/* قسم الحجز مغلق */}
+                    {isEditMode && !permissions.canEditBookingSection && (
+                        <BookingSectionLocked reason={permissions.bookingLockedReason} />
+                    )}
+
                     <div className="flex justify-between pt-6 border-t mt-8">
-                        <div className="flex gap-2">
-                            <Button onClick={() => handleSubmit('ACTIVE')} disabled={!isInfoValid || !isLocationValid() || isSubmitting}>
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                {courseData.deliveryType === 'in_person' ? 'إرسال للمراجعة' : 'إنشاء الدورة'}
-                            </Button>
+                        <div className="flex gap-2 flex-wrap">
+                            {!isEditMode ? (
+                                <>
+                                    <Button variant="outline" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting} className="text-gray-700">
+                                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ كمسودة
+                                    </Button>
+                                    <Button onClick={() => handleSubmit('ACTIVE')} disabled={!isInfoValid || !isLocationValid() || isSubmitting}>
+                                        {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                        إنشاء الدورة
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    {/* زر حفظ كمسودة */}
+                                    {permissions.showSaveAsDraft && (
+                                        <Button
+                                            variant="outline"
+                                            onClick={() => handleSubmit('DRAFT')}
+                                            disabled={isSubmitting}
+                                            id="btn-save-draft"
+                                        >
+                                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                            حفظ كمسودة
+                                        </Button>
+                                    )}
+
+                                    {/* زر نشر الدورة (draft → pending_minimum) */}
+                                    {permissions.showPublishCourse && (
+                                        <Button
+                                            onClick={() => handleSubmit('PENDING_MINIMUM')}
+                                            disabled={!isInfoValid || isSubmitting}
+                                            id="btn-publish-course"
+                                        >
+                                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                            نشر الدورة
+                                        </Button>
+                                    )}
+
+                                    {/* زر حفظ التغييرات (pending_min_waiting / active) */}
+                                    {permissions.showSaveChanges && (
+                                        <Button
+                                            onClick={() => handleSubmit(courseStatus as any)}
+                                            disabled={isSubmitting}
+                                            id="btn-save-changes"
+                                        >
+                                            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                            حفظ التغييرات
+                                        </Button>
+                                    )}
+
+                                    {/* زر نشر وإعلام الطلاب (pending_min_ready → active) */}
+                                    {permissions.showPublishAndNotify && (
+                                        <Button
+                                            onClick={handleActivateCourse}
+                                            disabled={isSubmitting}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                            id="btn-publish-notify"
+                                        >
+                                            {isSubmitting
+                                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                                : <Bell className="mr-2 h-4 w-4" />
+                                            }
+                                            نشر وإعلام الطلاب
+                                        </Button>
+                                    )}
+                                </>
+                            )}
                         </div>
                         <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
                     </div>

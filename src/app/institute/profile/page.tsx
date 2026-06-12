@@ -159,6 +159,8 @@ export default function InstituteProfilePage() {
   const [isBankModalOpen, setIsBankModalOpen] = useState(false)
   const [isSavingBank, setIsSavingBank] = useState(false)
   const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+  const [accountToDeleteId, setAccountToDeleteId] = useState<string | null>(null)
+  const [isDeletingBank, setIsDeletingBank] = useState(false)
   const [bankForm, setBankForm] = useState({
     bankName: "",
     accountName: "",
@@ -242,14 +244,18 @@ export default function InstituteProfilePage() {
     }
   }
 
-  const handleDeleteBankAccount = async (id: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذا الحساب البنكي؟")) return
+  const confirmDeleteBankAccount = async () => {
+    if (!accountToDeleteId) return
     try {
-      await instituteService.deleteBankAccount(id)
+      setIsDeletingBank(true)
+      await instituteService.deleteBankAccount(accountToDeleteId)
       toast.success("تم حذف الحساب البنكي بنجاح")
       fetchBankAccounts()
+      setAccountToDeleteId(null)
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, "حدث خطأ أثناء حذف الحساب البنكي"))
+    } finally {
+      setIsDeletingBank(false)
     }
   }
 
@@ -761,7 +767,7 @@ export default function InstituteProfilePage() {
                             <TableCell className="text-left">
                               <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="icon" onClick={() => openBankModal(account)}><Pencil className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteBankAccount(account.id)}><Trash2 className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => setAccountToDeleteId(account.id)}><Trash2 className="h-4 w-4" /></Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -868,6 +874,54 @@ export default function InstituteProfilePage() {
           </DialogContent>
         </Dialog>
       </div>
+
+      <Dialog
+        open={!!accountToDeleteId}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingBank) setAccountToDeleteId(null)
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="max-w-md rounded-[6.5px] border border-slate-200 bg-white p-0 shadow-xl [&>[data-dialog-close=default]]:hidden"
+        >
+          <div className="p-5 text-right">
+            <DialogHeader className="space-y-2 text-right">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 text-right">
+                  <DialogTitle className="text-lg font-bold text-slate-900">حذف الحساب البنكي</DialogTitle>
+                  <DialogDescription className="text-sm leading-6 text-slate-600">
+                    هل أنت متأكد من حذف هذا الحساب البنكي؟ لا يمكن التراجع عن هذا الإجراء بعد الحذف.
+                  </DialogDescription>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6.5px] bg-red-50 text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="mt-5 flex items-center justify-start gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-[6.5px] px-4"
+                onClick={() => setAccountToDeleteId(null)}
+                disabled={isDeletingBank}
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                className="h-9 rounded-[6.5px] bg-red-600 px-4 text-white hover:bg-red-700"
+                onClick={confirmDeleteBankAccount}
+                disabled={isDeletingBank}
+              >
+                {isDeletingBank ? "جاري الحذف..." : "حذف الحساب البنكي"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

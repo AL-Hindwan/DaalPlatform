@@ -35,6 +35,7 @@ class InstituteService {
             totalEarnings,
             recentBookings,
             upcomingCourses,
+            recentNotifications,
         ] = await Promise.all([
             // Active courses count
             prisma.course.count({
@@ -78,31 +79,43 @@ class InstituteService {
                 },
                 _sum: { amount: true },
             }),
-            // Recent room bookings
-            prisma.roomBooking.findMany({
+            // Recent Enrollments
+            prisma.enrollment.findMany({
                 where: {
-                    room: { instituteId: institute.id },
+                    course: { instituteId: institute.id, trainerId: null },
                 },
                 include: {
-                    room: { select: { name: true } },
                     course: { select: { title: true } },
-                    requestedBy: { select: { name: true } },
+                    student: { select: { name: true } },
                 },
-                orderBy: { createdAt: "desc" },
+                orderBy: { enrolledAt: "desc" },
                 take: 5,
             }),
-            // Upcoming courses (Broadened)
-            prisma.course.findMany({
+            // Upcoming sessions
+            prisma.session.findMany({
                 where: {
-                    instituteId: institute.id,
-                    startDate: { gte: new Date() },
-                    trainerId: null,
+                    course: { instituteId: institute.id, trainerId: null },
+                    status: "SCHEDULED",
+                    startTime: { gte: new Date() },
                 },
                 include: {
-                    trainer: { select: { name: true } },
-                    _count: { select: { enrollments: true } },
+                    course: {
+                        select: {
+                            title: true,
+                            trainer: { select: { name: true } },
+                            staffTrainerIds: true,
+                            _count: { select: { enrollments: true } },
+                        }
+                    },
+                    room: { select: { name: true } },
                 },
-                orderBy: { startDate: "asc" },
+                orderBy: { startTime: "asc" },
+                take: 5,
+            }),
+            // Recent Notifications
+            prisma.notification.findMany({
+                where: { userId },
+                orderBy: { createdAt: "desc" },
                 take: 5,
             }),
         ]);
@@ -122,26 +135,31 @@ class InstituteService {
                 totalStudents: totalStudents.length,
                 totalEarnings: Number(totalEarnings._sum.amount || 0),
             },
-            recentBookings: recentBookings.map((b) => ({
-                id: b.id,
-                courseTitle: b.course?.title || "حجز مباشر",
-                trainer: b.requestedBy?.name || "-",
-                room: b.room.name,
-                startDate: b.startDate,
-                endDate: b.endDate,
-                status: b.status.toLowerCase(),
+            recentEnrollments: recentBookings.map((e: any) => ({
+                id: e.id,
+                courseTitle: e.course?.title || "دورة",
+                studentName: e.student?.name || "طالب",
+                enrolledAt: e.enrolledAt,
+                status: e.status,
             })),
-            upcomingCourses: upcomingCourses.map((c) => {
-                const course = c as any;
+            upcomingSessions: upcomingCourses.map((s: any) => {
                 return {
-                    id: course.id,
-                    title: course.title,
-                    trainer: course.trainer?.name || (course.staffTrainerIds?.length > 0 ? "مدرب معهد" : "غير محدد"),
-                    startDate: course.startDate,
-                    enrolledStudents: course._count?.enrollments || 0,
-                    maxStudents: course.maxStudents,
+                    id: s.id,
+                    title: s.topic || "جلسة",
+                    courseTitle: s.course?.title || "",
+                    trainer: s.course?.trainer?.name || (s.course?.staffTrainerIds?.length > 0 ? "مدرب معهد" : "غير محدد"),
+                    startDate: s.startTime,
+                    enrolledStudents: s.course?._count?.enrollments || 0,
+                    type: s.type,
                 };
             }),
+            recentNotifications: recentNotifications.map((n: any) => ({
+                id: n.id,
+                title: n.title || "إشعار",
+                message: n.message || "",
+                createdAt: n.createdAt,
+                isRead: n.isRead,
+            })),
         };
     }
 
@@ -755,7 +773,8 @@ class InstituteService {
         const courses = await prisma.course.findMany({
             where: {
                 instituteId: institute.id,
-                trainerId: null
+                trainerId: null,
+                deletedAt: null
             },
             include: {
                 trainer: {
@@ -833,8 +852,23 @@ class InstituteService {
             throw new Error("الدورة غير موجودة أو لا تنتمي لهذا المعهد");
         }
 
-        await prisma.course.delete({
+        const activeEnrollmentCount = await prisma.enrollment.count({
+            where: {
+                courseId,
+                status: {
+                    in: ['ACTIVE', 'PRELIMINARY', 'PRELIMINARY_APPROVED', 'PENDING_PAYMENT']
+                },
+                deletedAt: null
+            }
+        });
+
+        if (activeEnrollmentCount > 0) {
+            throw new Error('لا يمكن حذف دورة بها طلاب مستمرون أو قيد الانتظار. يرجى إلغاء الدورة أو إلغاء تسجيل الطلاب أولاً.');
+        }
+
+        await prisma.course.update({
             where: { id: courseId },
+            data: { deletedAt: new Date() },
         });
 
         return { message: "تم حذف الدورة بنجاح" };

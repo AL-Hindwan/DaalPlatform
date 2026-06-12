@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react"
 import Image from "next/image"
-import { ChevronDown, Users, CalendarDays, Clock3, Eye, XCircle, Trash2 } from "lucide-react"
+import { ChevronDown, Users, CalendarDays, Clock3, Eye, XCircle, Trash2, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Course } from "@/types"
@@ -40,6 +41,8 @@ export default function AdminCourses() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [courseToDeleteId, setCourseToDeleteId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchCourses = async () => {
     try {
@@ -81,15 +84,18 @@ export default function AdminCourses() {
     }
   }
 
-  const deleteCourse = async (courseId: string) => {
-    const ok = window.confirm("هل أنت متأكد من حذف هذه الدورة؟")
-    if (!ok) return
+  const confirmDeleteCourse = async () => {
+    if (!courseToDeleteId) return
     try {
-      await adminService.deleteCourse(courseId)
+      setIsDeleting(true)
+      await adminService.deleteCourse(courseToDeleteId)
       toast.success("تم حذف الدورة")
-      setCourses((prev) => prev.filter((c) => c.id !== courseId))
+      setCourses((prev) => prev.filter((c) => c.id !== courseToDeleteId))
+      setCourseToDeleteId(null)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "فشل حذف الدورة")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -154,7 +160,7 @@ export default function AdminCourses() {
                     {(course.status === "active" || course.status === "draft") && (
                       <Button size="sm" variant="outline" className="h-8 text-orange-600" onClick={() => suspendCourse(course.id)}><XCircle className="h-4 w-4" /></Button>
                     )}
-                    <Button size="sm" variant="outline" className="h-8 text-red-600" onClick={() => deleteCourse(course.id)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button size="sm" variant="outline" className="h-8 text-red-600" onClick={() => setCourseToDeleteId(course.id)}><Trash2 className="h-4 w-4" /></Button>
                   </div>
                   <p className="whitespace-nowrap text-[20px] font-extrabold leading-none tracking-tight text-[#2563EB]">{formatPrice(course.price)} <span className="text-xs font-bold text-blue-500">ر.ي</span></p>
                 </div>
@@ -163,6 +169,54 @@ export default function AdminCourses() {
           </article>
         ))}
       </div>
+
+      <Dialog
+        open={!!courseToDeleteId}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setCourseToDeleteId(null)
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="max-w-md rounded-[6.5px] border border-slate-200 bg-white p-0 shadow-xl [&>[data-dialog-close=default]]:hidden"
+        >
+          <div className="p-5 text-right">
+            <DialogHeader className="space-y-2 text-right">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 text-right">
+                  <DialogTitle className="text-lg font-bold text-slate-900">حذف الدورة</DialogTitle>
+                  <DialogDescription className="text-sm leading-6 text-slate-600">
+                    هل أنت متأكد من حذف هذه الدورة؟ لا يمكن التراجع عن هذا الإجراء.
+                  </DialogDescription>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6.5px] bg-red-50 text-red-600">
+                  <X className="h-4 w-4" />
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="mt-5 flex items-center justify-start gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-[6.5px] px-4"
+                onClick={() => setCourseToDeleteId(null)}
+                disabled={isDeleting}
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                className="h-9 rounded-[6.5px] bg-red-600 px-4 text-white hover:bg-red-700"
+                onClick={confirmDeleteCourse}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "جاري الحذف..." : "حذف الدورة"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

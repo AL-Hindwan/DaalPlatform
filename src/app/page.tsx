@@ -33,9 +33,6 @@ type NavItem = { href: string; label: string }
 
 const navItems: NavItem[] = [
   { href: "/courses", label: "الدورات" },
-  { href: "#categories", label: "التصنيفات" },
-  { href: "/institutes", label: "المعاهد" },
-  { href: "/auth/register?role=trainer", label: "للمدربين" },
 ]
 
 const whyItems = [
@@ -67,23 +64,7 @@ const steps = [
   { id: 3, title: "ابدأ التعلم والمتابعة", desc: "احضر الجلسات وتابع تقدمك خطوة بخطوة." },
 ]
 
-const testimonials = [
-  {
-    name: "سارة أحمد",
-    role: "طالبة - مسار البرمجة",
-    text: "المنصة مرتبة جدًا وسهلة. قدرت أختار دورة مناسبة وانتهيت منها بثقة.",
-  },
-  {
-    name: "محمد علي",
-    role: "طالب - تحليل البيانات",
-    text: "المحتوى قوي والمتابعة ممتازة، خصوصًا وضوح مواعيد الجلسات والتسجيل.",
-  },
-  {
-    name: "نور خالد",
-    role: "طالبة - التصميم",
-    text: "أفضل تجربة عربية للتعلم حتى الآن. كل شيء واضح من البداية للنهاية.",
-  },
-]
+
 
 function categoryIcon(name: string) {
   const key = name.toLowerCase()
@@ -508,36 +489,7 @@ function PartnerCTASection() {
   )
 }
 
-function TestimonialsSection() {
-  return (
-    <section className="bg-slate-50 py-12" dir="rtl">
-      <div className="mx-auto w-full max-w-7xl px-4 sm:px-6">
-        <h2 className="text-right text-2xl font-extrabold text-slate-900 md:text-3xl">ماذا يقول طلابنا؟</h2>
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {testimonials.map((t) => (
-            <Card key={t.name} className="rounded-[6.5px] border border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-4 text-right">
-                <div className="mb-3 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 font-bold text-[#2563EB]">{t.name.slice(0, 1)}</div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{t.name}</p>
-                    <p className="text-xs text-slate-500">{t.role}</p>
-                  </div>
-                </div>
-                <div className="mb-2 flex items-center gap-1 text-amber-500">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-3.5 w-3.5 fill-current" />
-                  ))}
-                </div>
-                <p className="text-sm leading-7 text-slate-600">{t.text}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
+
 
 function FinalCTASection() {
   const { settings } = usePlatform()
@@ -569,30 +521,13 @@ function LandingFooter() {
 
   return (
     <footer className="border-t border-slate-200 bg-slate-900 py-10 text-slate-300" dir="rtl">
-      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-8 px-4 sm:px-6 md:grid-cols-4">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-8 px-4 sm:px-6 md:grid-cols-2">
         <div>
           <div className="mb-3 flex items-center gap-2">
             <span className="relative h-8 w-8"><Image src="/images/logo.png" alt={siteName} fill className="object-contain" /></span>
             <span className="text-xl font-extrabold text-white">{siteName}</span>
           </div>
           <p className="text-sm leading-7 text-slate-400">{siteDesc}</p>
-        </div>
-        <div>
-          <h4 className="mb-3 font-bold text-white">روابط سريعة</h4>
-          <div className="space-y-2 text-sm">
-            <Link href="/" className="block hover:text-white">الرئيسية</Link>
-            <Link href="/courses" className="block hover:text-white">الدورات</Link>
-            <Link href="/institutes" className="block hover:text-white">المعاهد</Link>
-            <Link href="/auth/register?role=trainer" className="block hover:text-white">للمدربين</Link>
-          </div>
-        </div>
-        <div>
-          <h4 className="mb-3 font-bold text-white">الحسابات</h4>
-          <div className="space-y-2 text-sm">
-            <Link href="/auth/register?role=student" className="block hover:text-white">طالب</Link>
-            <Link href="/auth/register?role=trainer" className="block hover:text-white">مدرب</Link>
-            <Link href="/auth/register?role=institute_admin" className="block hover:text-white">معهد</Link>
-          </div>
         </div>
         <div>
           <h4 className="mb-3 font-bold text-white">تواصل معنا</h4>
@@ -648,7 +583,6 @@ export default function HomePage() {
       <FeaturedCoursesSection courses={featured} loading={loading} />
       <HowItWorksSection />
       <PartnerCTASection />
-      <TestimonialsSection />
       <FinalCTASection />
       <LandingFooter />
     </main>

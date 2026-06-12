@@ -577,7 +577,7 @@ export default function CreateCoursePage() {
     }
 
     // --- Validation ---
-    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents);
+    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents) && (imageFile || imagePreview);
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
@@ -676,6 +676,7 @@ export default function CreateCoursePage() {
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">عنوان الدورة <span className="text-red-500">*</span></Label>
                                                 <Input value={courseData.title} onChange={e => setCourseData({ ...courseData, title: e.target.value })} placeholder="مثال: تعلم React" />
+                                                {showInfoErrors && !courseData.title.trim() && <p className="text-xs text-red-500 text-right mt-1">يرجى إدخال عنوان الدورة.</p>}
                                             </div>
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">الفئة <span className="text-red-500">*</span></Label>
@@ -732,6 +733,7 @@ export default function CreateCoursePage() {
                                                     <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>اختر الصورة</Button>
                                                     {imageFile && <Button type="button" variant="ghost" size="sm" className="text-red-500 hover:bg-red-50 hover:text-red-600" onClick={() => { setImageFile(null); setImagePreview(""); }}>إزالة</Button>}
                                                 </div>
+                                                {showInfoErrors && !imageFile && !imagePreview && <p className="text-xs text-red-500 mt-2 text-right">يرجى رفع صورة الدورة.</p>}
                                             </div>
                                         </div>
                                     </div>

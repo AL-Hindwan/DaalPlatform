@@ -100,7 +100,7 @@ class TrainerController {
     async getPublicCourseById(req: AuthRequest, res: Response, _next: NextFunction) {
         try {
             const { courseId } = req.params;
-            const data = await trainerService.getPublicCourseById(courseId);
+            const data = await trainerService.getPublicCourseById(courseId, req.user?.userId);
             return sendSuccess(res, 'تم جلب تفاصيل الدورة بنجاح', data);
         } catch (error: any) {
             return sendError(res, error.message, 404);

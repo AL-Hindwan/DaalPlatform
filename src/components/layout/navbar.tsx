@@ -90,9 +90,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
             <Button variant="ghost" asChild className="h-10 rounded-[6.5px] px-3 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#2563EB]">
               <Link href="/courses">الدورات</Link>
             </Button>
-            <Button variant="ghost" asChild className="h-10 rounded-[6.5px] px-3 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#2563EB]">
-              <Link href="/institutes">المعاهد</Link>
-            </Button>
           </div>
 
           <div className="md:hidden">
@@ -113,9 +110,6 @@ export function Navbar({ onMenuClick }: NavbarProps) {
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link href="/courses">الدورات التدريبية</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/institutes">المعاهد</Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   {!user && (

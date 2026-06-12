@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { formatDate, getFileUrl } from "@/lib/utils"
 import { instituteService } from "@/lib/institute-service"
@@ -63,6 +64,8 @@ export default function InstituteCourses() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [sortBy, setSortBy] = useState<string>("latest")
   const [searchQuery, setSearchQuery] = useState("")
+  const [courseToDelete, setCourseToDelete] = useState<any | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchCourses = async () => {
     try {
@@ -117,15 +120,18 @@ export default function InstituteCourses() {
     return { totalCourses, totalStudents, activeCourses, pendingApproval }
   }, [courses])
 
-  const deleteCourse = async (courseId: string) => {
-    const ok = window.confirm("هل أنت متأكد من حذف هذه الدورة؟")
-    if (!ok) return
+  const confirmDeleteCourse = async () => {
+    if (!courseToDelete) return
     try {
-      await instituteService.deleteCourse(courseId)
-      setCourses((prev) => prev.filter((c) => c.id !== courseId))
-      toast.success("تم حذف الدورة")
+      setIsDeleting(true)
+      await instituteService.deleteCourse(courseToDelete.id)
+      setCourses((prev) => prev.filter((c) => c.id !== courseToDelete.id))
+      toast.success("تم حذف الدورة بنجاح")
+      setCourseToDelete(null)
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "فشل حذف الدورة")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -248,7 +254,7 @@ export default function InstituteCourses() {
                       <DropdownMenuItem asChild><Link href={`/institute/courses/${course.id}`}><Eye className="ml-2 h-4 w-4" />عرض التفاصيل</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/institute/courses/create?editId=${course.id}`}><Edit className="ml-2 h-4 w-4" />تعديل الدورة</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/institute/students?courseId=${course.id}`}><UserCheck className="ml-2 h-4 w-4" />إدارة الطلاب</Link></DropdownMenuItem>
-                      <DropdownMenuItem className="text-rose-700 focus:text-rose-700" onClick={() => deleteCourse(course.id)}><Trash2 className="ml-2 h-4 w-4" />حذف الدورة</DropdownMenuItem>
+                      <DropdownMenuItem className="text-rose-700 focus:text-rose-700 cursor-pointer" onClick={() => setCourseToDelete(course)}><Trash2 className="ml-2 h-4 w-4" />حذف الدورة</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </section>
@@ -279,7 +285,7 @@ export default function InstituteCourses() {
                       <DropdownMenuItem asChild><Link href={`/institute/courses/${course.id}`}><Eye className="ml-2 h-4 w-4" />عرض التفاصيل</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/institute/courses/create?editId=${course.id}`}><Edit className="ml-2 h-4 w-4" />تعديل الدورة</Link></DropdownMenuItem>
                       <DropdownMenuItem asChild><Link href={`/institute/students?courseId=${course.id}`}><UserCheck className="ml-2 h-4 w-4" />إدارة الطلاب</Link></DropdownMenuItem>
-                      <DropdownMenuItem className="text-rose-700 focus:text-rose-700" onClick={() => deleteCourse(course.id)}><Trash2 className="ml-2 h-4 w-4" />حذف الدورة</DropdownMenuItem>
+                      <DropdownMenuItem className="text-rose-700 focus:text-rose-700 cursor-pointer" onClick={() => setCourseToDelete(course)}><Trash2 className="ml-2 h-4 w-4" />حذف الدورة</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -288,6 +294,54 @@ export default function InstituteCourses() {
           ))}
         </div>
       </div>
+
+      <Dialog
+        open={!!courseToDelete}
+        onOpenChange={(open) => {
+          if (!open && !isDeleting) setCourseToDelete(null)
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="max-w-md rounded-[6.5px] border border-slate-200 bg-white p-0 shadow-xl [&>[data-dialog-close=default]]:hidden"
+        >
+          <div className="p-5 text-right">
+            <DialogHeader className="space-y-2 text-right">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 text-right">
+                  <DialogTitle className="text-lg font-bold text-slate-900">حذف الدورة</DialogTitle>
+                  <DialogDescription className="text-sm leading-6 text-slate-600">
+                    هل أنت متأكد من حذف دورة «{normalizeText(courseToDelete?.title || "دورة غير معروفة")}»؟ لا يمكن التراجع عن هذا الإجراء بعد الحذف.
+                  </DialogDescription>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6.5px] bg-red-50 text-red-600">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="mt-5 flex items-center justify-start gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-[6.5px] px-4"
+                onClick={() => setCourseToDelete(null)}
+                disabled={isDeleting}
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                className="h-9 rounded-[6.5px] bg-red-600 px-4 text-white hover:bg-red-700"
+                onClick={confirmDeleteCourse}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "جاري الحذف..." : "حذف الدورة"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

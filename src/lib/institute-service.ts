@@ -1,6 +1,6 @@
 import apiClient from './api-client';
 
-interface InstituteDashboardData {
+export interface InstituteDashboardData {
     institute: {
         id: string;
         name: string;
@@ -15,22 +15,28 @@ interface InstituteDashboardData {
         totalStudents: number;
         totalEarnings: number;
     };
-    recentBookings: {
+    recentEnrollments: {
         id: string;
         courseTitle: string;
-        trainer: string;
-        room: string;
-        startDate: string;
-        endDate: string;
+        studentName: string;
+        enrolledAt: string;
         status: string;
     }[];
-    upcomingCourses: {
+    upcomingSessions: {
         id: string;
         title: string;
+        courseTitle: string;
         trainer: string;
         startDate: string;
         enrolledStudents: number;
-        maxStudents: number;
+        type: string;
+    }[];
+    recentNotifications: {
+        id: string;
+        title: string;
+        message: string;
+        createdAt: string;
+        isRead: boolean;
     }[];
 }
 
@@ -283,6 +289,22 @@ class InstituteService {
 
     async getPublicInstituteById(id: string): Promise<any> {
         const response = await apiClient.get<{ success: boolean; message: string; data: any }>(`/api/public/institutes/${id}`);
+        return response.data.data;
+    }
+
+    // ==========================================
+    // Course — Edit & Lifecycle
+    // ==========================================
+
+
+    /**
+     * تفعيل دورة PENDING_MINIMUM بعد اكتمال الحد الأدنى وإضافة الجلسات.
+     * يُحوّل جميع طلاب PRELIMINARY_APPROVED → PENDING_PAYMENT ويُرسل إشعار لكل طالب.
+     */
+    async activateCourse(courseId: string): Promise<{ courseId: string }> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: { courseId: string } }>(
+            `/api/institute/courses/${courseId}/activate`
+        );
         return response.data.data;
     }
 }

@@ -201,7 +201,7 @@ function MyCoursesPageContent() {
         description={enrollment.course.shortDescription || enrollment.course.description || ""}
         price={Number(enrollment.course.price || 0)}
         studentsCount={Number(enrollment.course.enrolledStudents || 0)}
-        duration={`${Number(enrollment.course.duration || 0)} أسابيع`}
+        duration={enrollment.course.deliveryType !== "in_person" ? `${Number(enrollment.course.duration || 0)} ساعة` : `${Number(enrollment.course.duration || 0)} جلسات`}
         image={getFileUrl(enrollment.course.image) || "/images/course-placeholder.png"}
         category={enrollment.course.category || "دورة"}
         instructor={{

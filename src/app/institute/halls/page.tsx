@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -242,6 +242,7 @@ export default function InstituteHallsPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [pendingBookingsCount, setPendingBookingsCount] = useState(0)
   const [bookingsStats, setBookingsStats] = useState({ total: 0, pending: 0, approved: 0 })
+  const [hallToDeleteId, setHallToDeleteId] = useState<string | null>(null)
 
   const loadHalls = async () => {
     setLoading(true)
@@ -416,15 +417,19 @@ export default function InstituteHallsPage() {
     }
   }
 
-  const handleDelete = async (hallId: string) => {
-    if (!confirm("هل أنت متأكد من حذف هذه القاعة؟")) return
+  const confirmDeleteHall = async () => {
+    if (!hallToDeleteId) return
     try {
-      await instituteService.removeHall(hallId)
+      setActionLoading(true)
+      await instituteService.removeHall(hallToDeleteId)
       toast.success("تم حذف القاعة بنجاح")
-      setHalls(prev => prev.filter(h => h.id !== hallId))
+      setHalls(prev => prev.filter(h => h.id !== hallToDeleteId))
       setIsEditOpen(false)
+      setHallToDeleteId(null)
     } catch {
       toast.error("فشل حذف القاعة")
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -989,7 +994,7 @@ export default function InstituteHallsPage() {
             <div className="sticky bottom-0 z-10 border-t border-slate-100 bg-white px-6 py-4">
               <div className="flex justify-between items-center w-full">
                 {!isCreating && (
-                  <Button variant="destructive" className="rounded-[6.5px]" onClick={() => handleDelete(editingForm!.id)}>
+                  <Button variant="destructive" className="rounded-[6.5px]" onClick={() => setHallToDeleteId(editingForm!.id)}>
                     حذف القاعة
                   </Button>
                 )}
@@ -1003,6 +1008,54 @@ export default function InstituteHallsPage() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!hallToDeleteId}
+        onOpenChange={(open) => {
+          if (!open && !actionLoading) setHallToDeleteId(null)
+        }}
+      >
+        <DialogContent
+          dir="rtl"
+          className="max-w-md rounded-[6.5px] border border-slate-200 bg-white p-0 shadow-xl [&>[data-dialog-close=default]]:hidden"
+        >
+          <div className="p-5 text-right">
+            <DialogHeader className="space-y-2 text-right">
+              <div className="flex items-start justify-between gap-3">
+                <div className="space-y-1 text-right">
+                  <DialogTitle className="text-lg font-bold text-slate-900">حذف القاعة</DialogTitle>
+                  <DialogDescription className="text-sm leading-6 text-slate-600">
+                    هل أنت متأكد من حذف هذه القاعة؟ لا يمكن التراجع عن هذا الإجراء وسيتم حذف جميع البيانات المتعلقة بها.
+                  </DialogDescription>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6.5px] bg-red-50 text-red-600">
+                  <X className="h-4 w-4" />
+                </div>
+              </div>
+            </DialogHeader>
+
+            <div className="mt-5 flex items-center justify-start gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 rounded-[6.5px] px-4"
+                onClick={() => setHallToDeleteId(null)}
+                disabled={actionLoading}
+              >
+                إلغاء
+              </Button>
+              <Button
+                type="button"
+                className="h-9 rounded-[6.5px] bg-red-600 px-4 text-white hover:bg-red-700"
+                onClick={confirmDeleteHall}
+                disabled={actionLoading}
+              >
+                {actionLoading ? "جاري الحذف..." : "حذف القاعة"}
+              </Button>
             </div>
           </div>
         </DialogContent>

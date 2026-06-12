@@ -5,7 +5,7 @@ import Link from "next/link"
 import Image from "next/image"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 export const dynamic = "force-dynamic"
-import { ChevronDown, Heart, Users, CalendarDays, Clock3 } from "lucide-react"
+import { ChevronDown, Heart, Users, CalendarDays, Clock3, Search } from "lucide-react"
 import { trainerService, type ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
@@ -192,7 +192,18 @@ function StudentCoursesPageContent(props: StudentCoursesPageProps) {
       <div className="mx-auto max-w-[1500px] -mt-3 space-y-3 bg-transparent pt-0 md:-mt-4 md:pt-0">
         <div className="rounded-3xl border border-slate-200/80 bg-white p-3 shadow-[0_4px_14px_rgba(15,23,42,0.035)] md:px-4 md:py-3.5">
           <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              <div className="relative w-full md:w-auto flex-1 min-w-[200px] md:max-w-xs">
+                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="ابحث عن دورة أو وسم..."
+                  value={q}
+                  onChange={(e) => updateQuery("q", e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none transition-all hover:border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                />
+              </div>
+
               <FilterSelect
                 value={sort}
                 onChange={(value) => updateQuery("sort", value)}
@@ -247,7 +258,7 @@ function StudentCoursesPageContent(props: StudentCoursesPageProps) {
                       </span>
                     ) : course.courseStatus === "ACTIVE" || (course as any).status === "ACTIVE" ? (
                       <span className="rounded-full border border-emerald-200/50 bg-emerald-500/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px]">
-                        مؤكدة الانعقاد
+                        مستمرة
                       </span>
                     ) : null}
                   </div>
@@ -272,10 +283,12 @@ function StudentCoursesPageContent(props: StudentCoursesPageProps) {
                       <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
                       <span>{course.sessionsCount} جلسات</span>
                     </div>
-                    <div className="inline-flex items-center gap-1">
-                      <Clock3 className="h-3.5 w-3.5 text-slate-500" />
-                      <span>{typeof course.duration === "number" ? course.duration : String(course.duration).replace(/[^\d]/g, "") || 0} أسابيع</span>
-                    </div>
+                    {course.deliveryType !== "in_person" && (
+                      <div className="inline-flex items-center gap-1">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+                        <span>{typeof course.duration === "number" ? course.duration : String(course.duration).replace(/[^\d]/g, "") || 0} ساعة</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-2 inline-flex items-center gap-2 text-[12px] text-slate-600">

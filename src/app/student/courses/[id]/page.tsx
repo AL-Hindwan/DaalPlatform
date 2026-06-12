@@ -470,9 +470,21 @@ function StudentEnrolledCoursePageContent() {
                   <div className="relative h-12 w-12 overflow-hidden rounded-full border border-slate-200">
                     <Image src={safeImage(instructor?.avatar)} alt={instructor?.name || "المدرب"} fill className="object-cover" unoptimized />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-0">
                     <p className="font-semibold text-slate-900">{instructor?.name || "غير محدد"}</p>
-                    <p className="text-xs text-slate-500">{(instructor?.specialties || [])[0] || instructor?.bio || ""}</p>
+                    {instructor?.bio && <p className="text-xs text-slate-500 mb-2">{instructor.bio}</p>}
+                    {instructor?.specialties && instructor.specialties.length > 0 && (
+                      <div className="mt-2 text-right">
+                        <p className="mb-1 text-[12px] font-bold text-slate-800">التخصصات:</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {instructor.specialties.map((spec: string) => (
+                            <span key={spec} className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                              {spec}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 py-1" dir="rtl">
@@ -511,9 +523,21 @@ function StudentEnrolledCoursePageContent() {
                     <div className="relative h-12 w-12 overflow-hidden rounded-full border border-slate-200">
                       <Image src={safeImage(institute.logo)} alt={institute.name || "المعهد"} fill className="object-cover" unoptimized />
                     </div>
-                    <div>
+                    <div className="flex-1 min-w-0">
                       <p className="font-semibold text-slate-900">{institute.name || "-"}</p>
-                      <p className="text-xs text-slate-500">{institute.description || ""}</p>
+                      {institute.description && <p className="text-xs text-slate-500 mb-2">{institute.description}</p>}
+                      {institute.features && institute.features.length > 0 && (
+                        <div className="mt-2 text-right">
+                          <p className="mb-1 text-[12px] font-bold text-slate-800">مميزات المعهد:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {institute.features.map((feature: string) => (
+                              <span key={feature} className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                                {feature}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -147,7 +147,8 @@ function computeDurationWeeks(startDate?: string | null, endDate?: string | null
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
   const diffMs = Math.abs(end.getTime() - start.getTime())
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1
-  return Math.max(1, Math.ceil(diffDays / 7))
+  if (diffDays < 7) return 0
+  return Math.floor(diffDays / 7)
 }
 
 function computeDurationDays(startDate?: string | null, endDate?: string | null) {
@@ -156,7 +157,8 @@ function computeDurationDays(startDate?: string | null, endDate?: string | null)
   const end = new Date(endDate)
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
   const diffMs = Math.abs(end.getTime() - start.getTime())
-  return Math.max(1, Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1)
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1
+  return diffDays % 7
 }
 
 function formatWeeksLabel(weeks: number) {
@@ -587,6 +589,7 @@ export default function TrainerExploreCourseDetailsPage() {
         email: instituteEmail,
         logo: instituteLogo,
         description: instituteDescription,
+        features: course.institute?.features || [],
       },
       courseStatus,
       minStudents: Number(course.minStudents || 0),
@@ -717,7 +720,7 @@ export default function TrainerExploreCourseDetailsPage() {
     <div className="min-h-screen bg-[#F5F7FB] text-right" dir="rtl">
       <section className="w-full overflow-visible bg-gradient-to-l from-blue-600 to-sky-500 text-white">
         <div className="mx-auto max-w-7xl px-6 md:px-8">
-          <div className="relative grid gap-5 pb-16 pt-6 md:pb-20 md:pt-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-center lg:gap-8 lg:pb-24 lg:pt-9">
+          <div className="relative grid gap-5 pb-16 pt-6 md:pb-20 md:pt-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:pb-24 lg:pt-9">
             <div className="space-y-3 text-right">
               <div className="flex flex-wrap items-center justify-start gap-2">
                 <Button asChild variant="outline" className="h-10 rounded-[6.5px] border-white/20 bg-white/10 px-4 text-white hover:bg-white/15 hover:text-white">
@@ -737,7 +740,7 @@ export default function TrainerExploreCourseDetailsPage() {
                     </Badge>
                   ) : view.courseStatus === "ACTIVE" ? (
                     <Badge className="h-7 rounded-[6.5px] border-emerald-300/30 bg-emerald-500 text-white hover:bg-emerald-600">
-                      مؤكدة الانعقاد
+                      مستمرة
                     </Badge>
                   ) : null}
                 </div>
@@ -857,7 +860,7 @@ export default function TrainerExploreCourseDetailsPage() {
               </div>
             </div>
 
-            <div className="w-full shrink-0 lg:absolute lg:bottom-0 lg:left-6 lg:w-[340px] lg:translate-y-[42%]">
+            <div className="w-full shrink-0 lg:w-[340px]">
               <Card className="overflow-hidden rounded-[6.5px] border border-white/20 bg-gradient-to-b from-blue-900/45 via-blue-800/35 to-blue-950/30 shadow-[0_10px_24px_rgba(15,23,42,0.12)] backdrop-blur-md">
                 <div className="relative h-[190px] overflow-hidden rounded-t-[6.5px] bg-slate-100">
                   <Image src={resolveImage(course.image)} alt={view.title} fill className="object-cover" unoptimized />
@@ -892,20 +895,24 @@ export default function TrainerExploreCourseDetailsPage() {
                     </div>
                   ) : view.courseStatus === "ACTIVE" ? (
                     <div className="rounded-[6.5px] border border-emerald-400/20 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-300">
-                      ✓ الدورة مؤكدة الانعقاد
+                      ✓ الدورة مستمرة
                     </div>
                   ) : null}
-                  <Button
-                    onClick={handleMainAction}
-                    disabled={registrationUI.buttonDisabled}
-                    className="h-12 w-full rounded-[6.5px] bg-white px-4 text-sm font-semibold text-blue-700 shadow-none hover:bg-slate-100"
-                  >
-                    {registrationUI.buttonLabel}
-                  </Button>
-                  <Button onClick={handleFavorite} variant="outline" className="h-11 w-full rounded-[6.5px] border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white">
-                    <Heart className={`ml-2 h-4 w-4 ${isFavorite ? "fill-current text-red-500" : ""}`} />
-                    {isFavorite ? "في المفضلة" : "إضافة إلى المفضلة"}
-                  </Button>
+                  {(!user?.role || !['TRAINER', 'INSTITUTE_ADMIN', 'PLATFORM_ADMIN'].includes(user.role)) && (
+                    <>
+                      <Button
+                        onClick={handleMainAction}
+                        disabled={registrationUI.buttonDisabled}
+                        className="h-12 w-full rounded-[6.5px] bg-white px-4 text-sm font-semibold text-blue-700 shadow-none hover:bg-slate-100"
+                      >
+                        {registrationUI.buttonLabel}
+                      </Button>
+                      <Button onClick={handleFavorite} variant="outline" className="h-11 w-full rounded-[6.5px] border-white/25 bg-white/10 text-white hover:bg-white/15 hover:text-white">
+                        <Heart className={`ml-2 h-4 w-4 ${isFavorite ? "fill-current text-red-500" : ""}`} />
+                        {isFavorite ? "في المفضلة" : "إضافة إلى المفضلة"}
+                      </Button>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -1043,6 +1050,18 @@ export default function TrainerExploreCourseDetailsPage() {
                 <div className="min-w-0 text-right">
                   <h4 className="text-xl font-bold text-slate-900">{view.trainerName || "غير متوفر"}</h4>
                   {view.trainerSubtitle ? <p className="mt-1 text-sm text-slate-600">{view.trainerSubtitle}</p> : null}
+                  {view.instructor?.specialties && view.instructor.specialties.length > 0 && (
+                    <div className="mt-3">
+                      <p className="mb-2 text-[13px] font-bold text-slate-800">التخصصات:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {view.instructor.specialties.map(spec => (
+                          <span key={spec} className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                            {spec}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-700">
                     {view.trainerPhone ? (
                       <div className="inline-flex items-center gap-2">
@@ -1105,6 +1124,18 @@ export default function TrainerExploreCourseDetailsPage() {
                     {view.institute.description ? (
                       <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">{view.institute.description}</p>
                     ) : null}
+                    {view.institute.features && view.institute.features.length > 0 && (
+                      <div className="mt-3">
+                        <p className="mb-2 text-[13px] font-bold text-slate-800">مميزات المعهد:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {view.institute.features.map((feature: string) => (
+                            <span key={feature} className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                              {feature}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     {view.institute.locationUrl ? (
                       <a
                         href={view.institute.locationUrl}

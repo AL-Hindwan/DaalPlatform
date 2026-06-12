@@ -604,7 +604,8 @@ class StudentService {
                                 phone: true,
                                 address: true,
                                 description: true,
-                                locationUrl: true
+                                locationUrl: true,
+                                features: true
                             }
                         }
                     }
@@ -733,6 +734,7 @@ class StudentService {
                 address: (course as any).institute.address,
                 locationUrl: (course as any).institute.locationUrl,
                 description: (course as any).institute.description,
+                features: (course as any).institute.features ?? [],
             } : null,
             sessions: course.sessions.map(s => ({
                 id: s.id,

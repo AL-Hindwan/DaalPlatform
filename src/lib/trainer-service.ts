@@ -30,6 +30,20 @@ export interface TrainerDashboardData {
         requestedRoom: string;
         status: string;
     }[];
+    recentEnrollments: {
+        id: string;
+        courseTitle: string;
+        studentName: string;
+        enrolledAt: string;
+        status: string;
+    }[];
+    recentNotifications: {
+        id: string;
+        title: string;
+        message: string;
+        createdAt: string;
+        isRead: boolean;
+    }[];
 }
 
 export interface ExploreCourse {
@@ -134,6 +148,7 @@ export interface CourseDetail {
         email: string | null;
         phone: string | null;
         description: string | null;
+        features?: string[];
     } | null;
 }
 
@@ -401,6 +416,32 @@ class TrainerService {
 
     async deleteBankAccount(accountId: string): Promise<void> {
         await apiClient.delete(`/api/trainer/bank-accounts/${accountId}`);
+    }
+
+    // ==========================================
+    // Course Lifecycle — Activation
+    // ==========================================
+
+    /**
+     * تفعيل دورة PENDING_MINIMUM بعد اكتمال الحد الأدنى وإضافة الجلسات.
+     * يُحوّل جميع طلاب PRELIMINARY_APPROVED → PENDING_PAYMENT ويُرسل إشعار لكل طالب.
+     */
+    async activateCourse(courseId: string): Promise<{ courseId: string }> {
+        const response = await apiClient.patch<{ success: boolean; message: string; data: { courseId: string } }>(
+            `/api/trainer/courses/${courseId}/activate`
+        );
+        return response.data.data;
+    }
+
+    /**
+     * جلب بيانات دورة واحدة للتعديل مع إحصاء الطلاب المقبولين مبدئياً.
+     * يُعيد نفس بيانات getTrainerCourseById مع إضافة enrolledCount.
+     */
+    async getTrainerCourseWithEnrollments(courseId: string): Promise<any> {
+        const response = await apiClient.get<{ success: boolean; message: string; data: any }>(
+            `/api/trainer/courses/${courseId}`
+        );
+        return response.data.data;
     }
 
 }

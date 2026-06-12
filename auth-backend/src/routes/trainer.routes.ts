@@ -6,6 +6,10 @@ import multer from 'multer';
 
 const router = Router();
 
+// Explore (public course catalog)
+router.get('/explore', trainerController.getExploreCourses);
+router.get('/explore/:courseId', trainerController.getPublicCourseById);
+
 // All trainer routes require authentication
 router.use(authenticate);
 
@@ -20,9 +24,6 @@ router.get('/categories', trainerController.getCategories);
 router.post('/categories', trainerController.createCategory);
 router.post('/tags', trainerController.createTag);
 
-// Explore (public course catalog)
-router.get('/explore', trainerController.getExploreCourses);
-router.get('/explore/:courseId', trainerController.getPublicCourseById);
 
 // Halls
 router.get('/halls', trainerController.getHalls);

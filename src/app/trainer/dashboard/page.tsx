@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
@@ -28,6 +28,16 @@ function relativeMinutes(dateIso: string) {
   if (minutes < 60) return `منذ ${minutes} دقيقة`
   const hours = Math.floor(minutes / 60)
   return `منذ ${hours} ساعة`
+}
+
+function statusLabel(status?: string) {
+  const value = (status || "").toLowerCase()
+  if (value === "approved" || value === "accepted" || value === "active") return "نشط"
+  if (value === "pending_payment") return "بانتظار الدفع"
+  if (value === "preliminary") return "مبدئي"
+  if (value === "rejected") return "مرفوض"
+  if (value === "cancelled") return "ملغي"
+  return "قيد المراجعة"
 }
 
 export default function TrainerDashboard() {
@@ -86,21 +96,13 @@ export default function TrainerDashboard() {
     )
   }
 
-  const { stats, upcomingSessions, pendingRoomBookings } = data
-  const quickAlerts = [
-    ...pendingRoomBookings.slice(0, 2).map((b) => ({
-      title: "طلب تسجيل جديد",
-      subtitle: `${b.sessionTitle}`,
-      time: relativeMinutes(b.requestedDate),
-      dot: "bg-emerald-500",
-    })),
-    ...upcomingSessions.slice(0, 1).map((s) => ({
-      title: "إشعار جلسة قادمة",
-      subtitle: `${s.title}`,
-      time: relativeMinutes(s.startTime),
-      dot: "bg-blue-500",
-    })),
-  ]
+  const { stats, upcomingSessions, pendingRoomBookings, recentEnrollments, recentNotifications } = data
+  const quickAlerts = (recentNotifications || []).slice(0, 3).map((notification) => ({
+      title: notification.title,
+      subtitle: notification.message,
+      time: relativeMinutes(notification.createdAt),
+      dot: notification.isRead ? "bg-slate-300" : "bg-blue-500",
+  }))
 
   return (
     <div className="mx-auto max-w-7xl space-y-5 pb-10" dir="rtl">
@@ -191,21 +193,23 @@ export default function TrainerDashboard() {
             <Link href="/trainer/students" className="text-sm font-bold text-blue-600 hover:text-blue-700">عرض الكل</Link>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col p-4">
-            {pendingRoomBookings.length === 0 ? (
+            {(!recentEnrollments || recentEnrollments.length === 0) ? (
               <div className="flex flex-1 items-center justify-center">
                 <p className="text-center text-sm text-slate-500">لا توجد طلبات جديدة</p>
               </div>
             ) : (
               <div className="flex-1 space-y-3">
-                {pendingRoomBookings.slice(0, 3).map((req, idx) => (
+                {recentEnrollments.slice(0, 3).map((req, idx) => (
                   <div key={req.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
                     <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-black text-blue-600">
                       {idx + 1}
                     </div>
                     <div className="min-w-0 flex-1 px-3 text-right">
-                      <p className="truncate text-sm font-bold text-slate-800">{req.sessionTitle}</p>
+                      <p className="truncate text-sm font-bold text-slate-800">{req.studentName}</p>
                       <p className="truncate text-xs text-slate-500">{req.courseTitle}</p>
-                      <p className="mt-1 text-xs text-slate-400">{relativeMinutes(req.requestedDate)}</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {statusLabel(req.status)} • {relativeMinutes(req.enrolledAt)}
+                      </p>
                     </div>
                   </div>
                 ))}
@@ -230,18 +234,21 @@ export default function TrainerDashboard() {
               <p className="py-5 text-center text-sm text-slate-500">لا توجد دروس قادمة</p>
             ) : (
               <>
-                <div className="rounded-xl border border-slate-100 p-3">
-                  <div className="mb-2 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-600">بعد 1 ساعة</div>
-                  <p className="text-base font-extrabold text-slate-900">{upcomingSessions[0].title}</p>
-                  <p className="text-xs text-slate-500">{upcomingSessions[0].courseTitle}</p>
-                  <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                    <span>{formatDate(new Date(upcomingSessions[0].startTime))}</span>
-                    <span>{formatTime(new Date(upcomingSessions[0].startTime))} - {formatTime(new Date(upcomingSessions[0].endTime))}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-                    <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {upcomingSessions[0].enrolledStudents} طالب</span>
-                    <Badge variant="outline" className="text-[11px]">{upcomingSessions[0].type === "online" ? "جلسة مباشرة" : "جلسة حضورية"}</Badge>
-                  </div>
+                <div className="flex-1 space-y-3">
+                  {upcomingSessions.slice(0, 3).map((session, idx) => (
+                    <div key={session.id || idx} className="rounded-xl border border-slate-100 p-3">
+                      <p className="text-base font-extrabold text-slate-900">{session.title}</p>
+                      <p className="text-xs text-slate-500">{session.courseTitle}</p>
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                        <span>{formatDate(new Date(session.startTime))}</span>
+                        <span>{formatTime(new Date(session.startTime))} - {formatTime(new Date(session.endTime))}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> {session.enrolledStudents} طالب</span>
+                        <Badge variant="outline" className="text-[11px]">{String(session.type).toUpperCase() === "ONLINE" ? "جلسة أونلاين" : "جلسة حضورية"}</Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <Button asChild className="mt-4 h-10 w-full rounded-lg bg-[#2563EB] hover:bg-blue-700">
                   <Link href="/trainer/schedule">عرض التفاصيل</Link>

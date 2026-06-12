@@ -61,6 +61,8 @@ export default function TrainerProfilePage() {
     const [isBankModalOpen, setIsBankModalOpen] = useState(false)
     const [isSavingBank, setIsSavingBank] = useState(false)
     const [editingAccountId, setEditingAccountId] = useState<string | null>(null)
+    const [accountToDeleteId, setAccountToDeleteId] = useState<string | null>(null)
+    const [isDeletingBank, setIsDeletingBank] = useState(false)
     const [bankForm, setBankForm] = useState({
         bankName: "",
         accountName: "",
@@ -172,16 +174,20 @@ export default function TrainerProfilePage() {
         }
     }
 
-    const handleDeleteBankAccount = async (id: string) => {
-        if (!confirm("هل أنت متأكد من حذف هذا الحساب البنكي؟")) return
+    const confirmDeleteBankAccount = async () => {
+        if (!accountToDeleteId) return
 
         try {
-            await trainerService.deleteBankAccount(id)
+            setIsDeletingBank(true)
+            await trainerService.deleteBankAccount(accountToDeleteId)
             toast.success("تم حذف الحساب البنكي بنجاح")
             fetchBankAccounts()
+            setAccountToDeleteId(null)
         } catch (error: any) {
             console.error("Error deleting bank account:", error)
             toast.error(error.message || "حدث خطأ أثناء حذف الحساب البنكي")
+        } finally {
+            setIsDeletingBank(false)
         }
     }
 
@@ -692,7 +698,7 @@ export default function TrainerProfilePage() {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    onClick={() => handleDeleteBankAccount(account.id)}
+                                                    onClick={() => setAccountToDeleteId(account.id)}
                                                     className="text-red-500 hover:bg-red-50 hover:text-red-600 h-9 w-9 rounded-lg border border-[#E5EAF3]"
                                                 >
                                                     <Trash2 className="h-4 w-4" />
@@ -832,9 +838,53 @@ export default function TrainerProfilePage() {
                 </DialogContent>
             </Dialog>
 
+            <Dialog
+                open={!!accountToDeleteId}
+                onOpenChange={(open) => {
+                    if (!open && !isDeletingBank) setAccountToDeleteId(null)
+                }}
+            >
+                <DialogContent
+                    dir="rtl"
+                    className="max-w-md rounded-[6.5px] border border-slate-200 bg-white p-0 shadow-xl [&>[data-dialog-close=default]]:hidden"
+                >
+                    <div className="p-5 text-right">
+                        <DialogHeader className="space-y-2 text-right">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="space-y-1 text-right">
+                                    <DialogTitle className="text-lg font-bold text-slate-900">حذف الحساب البنكي</DialogTitle>
+                                    <DialogDescription className="text-sm leading-6 text-slate-600">
+                                        هل أنت متأكد من حذف هذا الحساب البنكي؟ لا يمكن التراجع عن هذا الإجراء بعد الحذف.
+                                    </DialogDescription>
+                                </div>
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6.5px] bg-red-50 text-red-600">
+                                    <Trash2 className="h-4 w-4" />
+                                </div>
+                            </div>
+                        </DialogHeader>
+
+                        <div className="mt-5 flex items-center justify-start gap-2">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="h-9 rounded-[6.5px] px-4"
+                                onClick={() => setAccountToDeleteId(null)}
+                                disabled={isDeletingBank}
+                            >
+                                إلغاء
+                            </Button>
+                            <Button
+                                type="button"
+                                className="h-9 rounded-[6.5px] bg-red-600 px-4 text-white hover:bg-red-700"
+                                onClick={confirmDeleteBankAccount}
+                                disabled={isDeletingBank}
+                            >
+                                {isDeletingBank ? "جاري الحذف..." : "حذف الحساب البنكي"}
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     )
 }
-
-
-

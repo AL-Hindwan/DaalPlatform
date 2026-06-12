@@ -165,6 +165,7 @@ model Course {
   instituteId      String?         @map("institute_id")
   categoryId       String?         @map("category_id")
   deactivatedAt    DateTime?       @map("deactivated_at")
+  deletedAt        DateTime?       @map("deleted_at")
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
   announcements    Announcement[]

@@ -17,7 +17,7 @@ export function Footer() {
   return (
     <footer className="bg-gray-900 text-gray-300 pt-16 pb-8 border-t border-gray-800" dir="rtl">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 mb-12">
           {/* Brand Column */}
           <div>
             <div className="flex items-center gap-3 mb-6">
@@ -45,27 +45,7 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-white font-bold text-lg mb-6">روابط سريعة</h3>
-            <ul className="space-y-4">
-              <li>
-                <Link href="/about" className="hover:text-primary transition-colors block">من نحن</Link>
-              </li>
-              <li>
-                <Link href="/courses" className="hover:text-primary transition-colors block">الدورات التدريبية</Link>
-              </li>
-              <li>
-                <Link href="/institutes" className="hover:text-primary transition-colors block">المعاهد الشريكة</Link>
-              </li>
-              <li>
-                <Link href="/instructors" className="hover:text-primary transition-colors block">المدربون</Link>
-              </li>
-              <li>
-                <Link href="/blog" className="hover:text-primary transition-colors block">المدونة</Link>
-              </li>
-            </ul>
-          </div>
+
 
           {/* Support */}
           <div>

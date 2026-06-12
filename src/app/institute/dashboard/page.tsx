@@ -7,41 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { AlertCircle, Bell, BookOpen, Building2, CalendarDays, Clock3, Loader2, Plus, Users, UserPlus } from "lucide-react"
 import { formatDate, formatTime } from "@/lib/utils"
-import { instituteService } from "@/lib/institute-service"
-
-type DashboardData = {
-  institute: {
-    id: string
-    name: string
-    adminName: string
-    verificationStatus: string
-  }
-  stats: {
-    activeCourses: number
-    totalCourses: number
-    rooms: number
-    roomBookingsToday: number
-    totalStudents: number
-    totalEarnings: number
-  }
-  recentBookings: {
-    id: string
-    courseTitle: string
-    trainer: string
-    room: string
-    startDate: string
-    endDate: string
-    status: string
-  }[]
-  upcomingCourses: {
-    id: string
-    title: string
-    trainer: string
-    startDate: string
-    enrolledStudents: number
-    maxStudents: number
-  }[]
-}
+import { instituteService, InstituteDashboardData } from "@/lib/institute-service"
 
 function relativeMinutes(dateIso?: string) {
   if (!dateIso) return "الآن"
@@ -75,7 +41,7 @@ function statusLabel(status?: string) {
 }
 
 export default function InstituteDashboard() {
-  const [data, setData] = useState<DashboardData | null>(null)
+  const [data, setData] = useState<InstituteDashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -95,41 +61,33 @@ export default function InstituteDashboard() {
         totalStudents: 0,
         totalRooms: 0,
         pendingBookings: 0,
-        upcomingSession: null as DashboardData["upcomingCourses"][number] | null,
-        newEnrollments: [] as DashboardData["recentBookings"],
+        upcomingSessions: [] as InstituteDashboardData["upcomingSessions"],
+        newEnrollments: [] as InstituteDashboardData["recentEnrollments"],
         notifications: [] as { title: string; subtitle: string; time: string; dot: string }[],
       }
     }
 
-    const sortedUpcoming = [...(data.upcomingCourses || [])].sort(
+    const sortedUpcoming = [...(data.upcomingSessions || [])].sort(
       (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
     )
-    const upcomingSession = sortedUpcoming[0] || null
-    const newEnrollments = (data.recentBookings || []).slice(0, 3)
-    const pendingBookings = (data.recentBookings || []).filter((booking) => isPendingStatus(booking.status)).length
+    const upcomingSessions = sortedUpcoming.slice(0, 3)
+    const newEnrollments = (data.recentEnrollments || []).slice(0, 3)
+    const todayBookingsCount = data.stats?.roomBookingsToday || 0
 
-    const notifications = [
-      ...(data.recentBookings || []).slice(0, 1).map((booking) => ({
-        title: "حجز جديد بانتظار المراجعة",
-        subtitle: booking.courseTitle || "طلب حجز جديد",
-        time: relativeMinutes(booking.startDate),
-        dot: "bg-amber-500",
-      })),
-      ...(data.upcomingCourses || []).slice(0, 1).map((course) => ({
-        title: "جلسة قادمة",
-        subtitle: course.title || "دورة قادمة",
-        time: relativeMinutes(course.startDate),
-        dot: "bg-blue-500",
-      })),
-    ].slice(0, 2)
+    const notifications = (data.recentNotifications || []).slice(0, 3).map((notification: any) => ({
+        title: notification.title,
+        subtitle: notification.message,
+        time: relativeMinutes(notification.createdAt),
+        dot: notification.isRead ? "bg-slate-300" : "bg-blue-500",
+    }))
 
     return {
       instituteName: data.institute?.name || "المعهد",
       totalCourses: data.stats?.totalCourses ?? 0,
       totalStudents: data.stats?.totalStudents ?? 0,
       totalRooms: data.stats?.rooms ?? 0,
-      pendingBookings,
-      upcomingSession,
+      todayBookingsCount,
+      upcomingSessions,
       newEnrollments,
       notifications,
     }
@@ -219,8 +177,8 @@ export default function InstituteDashboard() {
             </div>
             <div className="rounded-xl border border-white/15 bg-white/10 p-3 text-center backdrop-blur-sm">
               <Clock3 className="mx-auto mb-2 h-5 w-5 text-blue-100" />
-              <div className="text-3xl font-black leading-none">{dashboard.pendingBookings}</div>
-              <div className="mt-1 text-xs text-blue-100">حجوزات معلقة</div>
+              <div className="text-3xl font-black leading-none">{dashboard.todayBookingsCount}</div>
+              <div className="mt-1 text-xs text-blue-100">حجوزات اليوم</div>
             </div>
           </div>
         </div>
@@ -238,30 +196,33 @@ export default function InstituteDashboard() {
             </Link>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col p-4">
-            {!dashboard.upcomingSession ? (
+            {!dashboard.upcomingSessions || dashboard.upcomingSessions.length === 0 ? (
               <div className="flex flex-1 items-center justify-center">
                 <p className="text-center text-sm text-slate-500">لا توجد جلسات قادمة</p>
               </div>
             ) : (
               <>
-                <div className="rounded-xl border border-slate-100 p-3">
-                  <p className="text-base font-extrabold text-slate-900">{dashboard.upcomingSession.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">المدرب: {dashboard.upcomingSession.trainer || "غير محدد"}</p>
-                  <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
-                    <span>{formatDate(new Date(dashboard.upcomingSession.startDate))}</span>
-                    <span>{formatTime(new Date(dashboard.upcomingSession.startDate))}</span>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
-                    <span className="inline-flex items-center gap-1">
-                      <Users className="h-3.5 w-3.5" />
-                      {dashboard.upcomingSession.enrolledStudents || 0} طالب
-                    </span>
-                    <Badge variant="outline" className="text-[11px]">
-                      دورة حضورية
-                    </Badge>
-                  </div>
+                <div className="flex-1 space-y-3">
+                  {dashboard.upcomingSessions.map((session: any, idx: number) => (
+                    <div key={session.id || idx} className="rounded-xl border border-slate-100 p-3">
+                      <p className="text-base font-extrabold text-slate-900">{session.title}</p>
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
+                        <span>{formatDate(new Date(session.startDate))}</span>
+                        <span>{formatTime(new Date(session.startDate))}</span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-slate-600">
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {session.enrolledStudents || 0} طالب
+                        </span>
+                        <Badge variant="outline" className="text-[11px]">
+                          {String(session.type).toUpperCase() === "ONLINE" ? "جلسة أونلاين" : "جلسة حضورية"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <Button asChild className="mt-auto h-10 w-full rounded-lg bg-[#2563EB] hover:bg-blue-700">
+                <Button asChild className="mt-4 h-10 w-full rounded-lg bg-[#2563EB] hover:bg-blue-700">
                   <Link href="/institute/schedule">عرض الجدول</Link>
                 </Button>
               </>
@@ -286,16 +247,16 @@ export default function InstituteDashboard() {
               </div>
             ) : (
               <div className="flex-1 space-y-3">
-                {dashboard.newEnrollments.map((request, idx) => (
+                {dashboard.newEnrollments.map((request: any, idx: number) => (
                   <div key={request.id} className="flex items-center justify-between rounded-lg border border-slate-100 p-3">
                     <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-sm font-black text-blue-600">
                       {idx + 1}
                     </div>
                     <div className="min-w-0 flex-1 px-3 text-right">
-                      <p className="truncate text-sm font-bold text-slate-800">{request.trainer || "طالب جديد"}</p>
-                      <p className="truncate text-xs text-slate-500">{request.courseTitle || "طلب تسجيل جديد"}</p>
+                      <p className="truncate text-sm font-bold text-slate-800">{request.studentName}</p>
+                      <p className="truncate text-xs text-slate-500">{request.courseTitle}</p>
                       <p className="mt-1 text-xs text-slate-400">
-                        {statusLabel(request.status)} • {relativeMinutes(request.startDate)}
+                        {statusLabel(request.status)} • {relativeMinutes(request.enrolledAt)}
                       </p>
                     </div>
                   </div>
@@ -325,7 +286,7 @@ export default function InstituteDashboard() {
               </div>
             ) : (
               <div className="flex-1 space-y-3">
-                {dashboard.notifications.map((item, idx) => (
+                {dashboard.notifications.map((item: any, idx: number) => (
                   <div key={`${item.title}-${idx}`} className="flex items-start gap-3 rounded-lg border border-slate-100 p-3">
                     <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${item.dot}`} />
                     <div className="min-w-0 flex-1 text-right">

@@ -1,322 +1,353 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import { Suspense, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
-
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { Checkbox } from "@/components/ui/checkbox"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Search, Filter, AlertCircle, Loader2 } from "lucide-react"
-import { CourseCard } from "@/components/course-card"
-import { trainerService, ExploreCourse } from "@/lib/trainer-service"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+export const dynamic = "force-dynamic"
+import { ChevronDown, Heart, Users, CalendarDays, Clock3, Search } from "lucide-react"
+import { trainerService, type ExploreCourse } from "@/lib/trainer-service"
 import { studentService } from "@/lib/student-service"
 import { useAuth } from "@/contexts/auth-context"
-import { HallDetailsModal } from "@/components/halls/HallDetailsModal"
+import { toast } from "sonner"
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-
-function resolveImage(src: string | null): string {
-  if (!src) return "/images/course-web.png"
-  if (src.startsWith("http")) return src
-  const cleanSrc = src.replace(/\\/g, "/")
-  const separator = cleanSrc.startsWith("/") ? "" : "/"
-  return `${API_BASE}${separator}${cleanSrc}`
+function formatPrice(value: number) {
+  return new Intl.NumberFormat("en-US").format(value || 0)
 }
 
-const deliveryTypesMap: Record<string, string> = {
-  "أونلاين": "online",
-  "حضوري": "in_person",
-  "حضور وأونلاين": "hybrid",
-  "يعتمد على المعهد لاحقاً": "flexible"
+const FALLBACK_COURSE_IMAGE = "/images/course-web.png"
+
+function resolveCourseImage(image?: string | null) {
+  if (!image) return FALLBACK_COURSE_IMAGE
+
+  const cleaned = image.trim().replace(/\\/g, "/")
+  if (!cleaned) return FALLBACK_COURSE_IMAGE
+
+  if (cleaned.startsWith("data:") || cleaned.startsWith("blob:")) return cleaned
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return encodeURI(cleaned)
+
+  const apiBase = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+  const normalized = cleaned.startsWith("/") ? cleaned : `/${cleaned}`
+  return encodeURI(`${apiBase}${normalized}`)
 }
 
-const deliveryTypes = ["أونلاين", "حضوري", "حضور وأونلاين", "يعتمد على المعهد لاحقاً"]
+function CourseImage({ src, alt }: { src: string; alt: string }) {
+  const [currentSrc, setCurrentSrc] = useState(src)
+
+  useEffect(() => {
+    setCurrentSrc(src)
+  }, [src])
+
+  return (
+    <Image
+      src={currentSrc}
+      alt={alt}
+      fill
+      unoptimized
+      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 25vw"
+      className="object-cover object-center"
+      onError={() => {
+        if (currentSrc !== FALLBACK_COURSE_IMAGE) setCurrentSrc(FALLBACK_COURSE_IMAGE)
+      }}
+    />
+  )
+}
+
+function creatorName(course: any) {
+  return course.trainer?.name || course.instructor?.name || course.institute?.name || course.providerName || "غير محدد"
+}
+
+function creatorAvatar(course: any) {
+  const avatar =
+    course.trainer?.avatar ||
+    course.trainerAvatar ||
+    course.instructor?.avatar ||
+    course.institute?.logo ||
+    course.instituteAvatar
+  return resolveCourseImage(avatar || "")
+}
+
+function fallbackAvatarDataUri(name: string) {
+  const letter = (name || "؟").trim().charAt(0) || "؟"
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='64' height='64'><rect width='100%' height='100%' rx='32' fill='#DBEAFE'/><text x='50%' y='55%' text-anchor='middle' dominant-baseline='middle' font-family='Thmanyah Sans' font-size='28' font-weight='700' fill='#1D4ED8'>${letter}</text></svg>`
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+}
+
+function FilterSelect({
+  value,
+  onChange,
+  options,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: { label: string; value: string }[]
+}) {
+  return (
+    <div className="relative">
+      <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-11 min-w-[130px] appearance-none rounded-xl border border-slate-200 bg-white px-4 pl-8 text-sm font-semibold text-slate-700 outline-none hover:border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
 
 interface CoursesPageProps {
   basePath?: string
 }
 
-export default function CoursesPage({ basePath = "/courses" }: CoursesPageProps) {
-  const [courses, setCourses] = useState<ExploreCourse[]>([])
-  const [categories, setCategories] = useState<{ id: string; name: string }[]>([{ id: "all", name: "جميع الفئات" }])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("جميع الفئات")
-  const [selectedDeliveryTypes, setSelectedDeliveryTypes] = useState<string[]>([])
-  const [priceRange, setPriceRange] = useState([0, 100000])
-  const [sortBy, setSortBy] = useState("newest")
-
+function CoursesPageContent(props: CoursesPageProps) {
+  const basePath = props.basePath ?? "/courses"
   const { user } = useAuth() ?? {}
-  const [wishlistIds, setWishlistIds] = useState<string[]>([])
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
-  const [isHallModalOpen, setIsHallModalOpen] = useState(false)
-  const [selectedHallId, setSelectedHallId] = useState<string | null>(null)
+  const [courses, setCourses] = useState<ExploreCourse[]>([])
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [favoriteIds, setFavoriteIds] = useState<string[]>([])
 
-  const fetchData = () => {
-    setLoading(true)
-    setError(null)
-    trainerService
-      .getExploreCourses()
-      .then((data) => {
-        setCourses(data.courses)
-        setCategories(
-          // Replace 'الكل' from API with 'جميع الفئات' to match existing UI
-          data.categories.map(c => c.id === 'all' ? { ...c, name: "جميع الفئات" } : c)
-        )
-      })
-      .catch((err) => {
-        console.error("Failed to load courses:", err)
-        setError("فشل تحميل الدورات. يرجى المحاولة مرة أخرى.")
-      })
-      .finally(() => setLoading(false))
-  }
+  const q = searchParams.get("q") ?? ""
+  const sort = searchParams.get("sort") ?? "newest"
+  const category = searchParams.get("category") ?? "all"
+  const price = searchParams.get("price") ?? "all"
+
+  const effectiveSort = useMemo(() => {
+    if (price === "high") return "price_high"
+    if (price === "low") return "price_low"
+    return sort
+  }, [price, sort])
 
   useEffect(() => {
-    fetchData()
-  }, [])
+    let cancelled = false
 
-  useEffect(() => {
-    if (user?.id) {
-      studentService.getWishlist()
-        .then((data) => {
-          setWishlistIds(data.map((item: any) => item.id))
+    const load = async () => {
+      setLoading(true)
+      try {
+        const data = await trainerService.getExploreCourses({
+          q: q || undefined,
+          category: category !== "all" ? category : undefined,
+          sort: (effectiveSort as "newest" | "oldest" | "price_low" | "price_high") || "newest",
         })
-        .catch(() => { })
-    } else {
-      setWishlistIds([])
+        if (!cancelled) {
+          setCourses(data.courses || [])
+          setCategories(data.categories || [])
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [q, category, effectiveSort])
+
+  useEffect(() => {
+    if (!user?.id) {
+      setFavoriteIds([])
+      return
+    }
+
+    studentService
+      .getWishlist()
+      .then((data) => setFavoriteIds(data.map((item: any) => item.id)))
+      .catch(() => {})
   }, [user?.id])
 
-  const toggleDeliveryType = (typeLabel: string) => {
-    const typeValue = deliveryTypesMap[typeLabel]
-    if (selectedDeliveryTypes.includes(typeValue)) {
-      setSelectedDeliveryTypes(selectedDeliveryTypes.filter(t => t !== typeValue))
-    } else {
-      setSelectedDeliveryTypes([...selectedDeliveryTypes, typeValue])
+  const updateQuery = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (!value || value === "all") params.delete(key)
+    else params.set(key, value)
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const toggleFavorite = async (id: string) => {
+    if (!user?.id) {
+      toast.error("يرجى تسجيل الدخول لإضافة الدورة إلى قائمة الرغبات")
+      return
+    }
+
+    try {
+      const result = await studentService.toggleWishlist(id)
+      setFavoriteIds((prev) => (result.added ? [...prev, id] : prev.filter((item) => item !== id)))
+      toast.success(result.added ? "تمت الإضافة إلى المفضلة" : "تمت الإزالة من المفضلة")
+    } catch (error: any) {
+      toast.error(error?.message || "حدث خطأ أثناء تحديث المفضلة")
     }
   }
 
-  const filteredCourses = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-
-    return courses.filter(course => {
-      const matchesSearch = query.length === 0 ||
-        course.title.toLowerCase().includes(query) ||
-        course.description?.toLowerCase().includes(query)
-
-      const matchesCategory = selectedCategory === "جميع الفئات" || course.category === selectedCategory
-
-      const matchesDelivery = selectedDeliveryTypes.length === 0 || selectedDeliveryTypes.includes(course.deliveryType)
-
-      const matchesPrice = course.price >= priceRange[0] && course.price <= priceRange[1]
-
-      return matchesSearch && matchesCategory && matchesDelivery && matchesPrice
-    })
-  }, [courses, searchQuery, selectedCategory, selectedDeliveryTypes, priceRange])
-
-  const visibleCourses = useMemo(() => {
-    const sorted = [...filteredCourses]
-    if (sortBy === "price-low") {
-      sorted.sort((a, b) => a.price - b.price)
-    } else if (sortBy === "price-high") {
-      sorted.sort((a, b) => b.price - a.price)
-    } else {
-      sorted.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    }
-    return sorted
-  }, [filteredCourses, sortBy])
-
   return (
-    <div className="min-h-screen bg-gray-50">
-
-      <div className="bg-muted/30 py-12 mb-8">
-        <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-bold mb-4">استكشف الدورات التدريبية</h1>
-          <p className="text-muted-foreground text-lg max-w-2xl">
+    <section dir="rtl" className="min-h-screen bg-gray-50 py-10">
+      <div className="mx-auto max-w-[1500px] px-4 space-y-6">
+        <div className="bg-muted/30 py-6 mb-4 rounded-2xl px-6 border border-slate-200">
+          <h1 className="text-3xl font-bold mb-2">استكشف الدورات التدريبية</h1>
+          <p className="text-muted-foreground text-md max-w-2xl">
             تصفح مئات الدورات التدريبية في مختلف المجالات واكتسب مهارات جديدة
           </p>
         </div>
-      </div>
 
-      <div className="container mx-auto px-4 pb-20">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar Filters */}
-          <div className="w-full lg:w-1/4 space-y-6">
-            <div className="glass-card p-6 rounded-xl sticky top-24">
-              <div className="flex items-center gap-2 mb-6">
-                <Filter className="h-5 w-5 text-primary" />
-                <h2 className="font-bold text-lg">تصفية النتائج</h2>
-              </div>
-
-              {/* Search */}
-              <div className="mb-6">
-                <div className="relative">
-                  <Search className="absolute right-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="بحث..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pr-9 bg-white/50"
-                  />
-                </div>
-              </div>
-
-              {/* Categories */}
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3">الفئة</h3>
-                <div className="space-y-2">
-                  {categories.map((category) => (
-                    <div key={category.id} className="flex items-center">
-                      <button
-                        onClick={() => setSelectedCategory(category.name)}
-                        className={`text-sm hover:text-primary transition-colors ${selectedCategory === category.name ? "text-primary font-bold" : "text-muted-foreground"
-                          }`}
-                      >
-                        {category.name}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Delivery Type */}
-              <div className="mb-6">
-                <h3 className="font-semibold mb-3">نوع الحضور</h3>
-                <div className="space-y-2">
-                  {deliveryTypes.map((type) => (
-                    <div key={type} className="flex items-center gap-2">
-                      <Checkbox
-                        id={type}
-                        checked={selectedDeliveryTypes.includes(type)}
-                        onCheckedChange={() => toggleDeliveryType(type)}
-                      />
-                      <label htmlFor={type} className="text-sm cursor-pointer select-none">
-                        {type}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price Range */}
-              <div>
-                <h3 className="font-semibold mb-3">السعر</h3>
-                <Slider
-                  value={priceRange}
-                  onValueChange={setPriceRange}
-                  max={100000}
-                  min={0}
-                  step={50}
-                  className="mb-2"
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-3 shadow-[0_4px_14px_rgba(15,23,42,0.035)] md:px-4 md:py-3.5">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+              <div className="relative w-full md:w-auto flex-1 min-w-[200px] md:max-w-xs">
+                <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="ابحث عن دورة أو وسم..."
+                  value={q}
+                  onChange={(e) => updateQuery("q", e.target.value)}
+                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none transition-all hover:border-blue-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>{priceRange[0]} ريال</span>
-                  <span>{priceRange[1]} ريال</span>
-                </div>
               </div>
+
+              <FilterSelect
+                value={sort}
+                onChange={(value) => updateQuery("sort", value)}
+                options={[
+                  { label: "الأحدث", value: "newest" },
+                  { label: "الأقدم", value: "oldest" },
+                ]}
+              />
+
+              <FilterSelect
+                value={category}
+                onChange={(value) => updateQuery("category", value)}
+                options={[
+                  { label: "كل التصنيفات", value: "all" },
+                  ...categories.filter((cat) => cat.id !== "all").map((cat) => ({ label: cat.name, value: cat.id })),
+                ]}
+              />
+
+              <FilterSelect
+                value={price}
+                onChange={(value) => updateQuery("price", value)}
+                options={[
+                  { label: "السعر", value: "all" },
+                  { label: "الأعلى", value: "high" },
+                  { label: "الأقل", value: "low" },
+                ]}
+              />
             </div>
-          </div>
-
-          <div className="w-full lg:w-3/4">
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-muted-foreground">
-                تم العثور على <span className="font-bold text-foreground">{visibleCourses.length}</span> دورة
-              </p>
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[180px] bg-white/50">
-                  <SelectValue placeholder="الترتيب حسب" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">الأحدث</SelectItem>
-                  <SelectItem value="price-low">السعر: الأقل</SelectItem>
-                  <SelectItem value="price-high">السعر: الأعلى</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {loading && (
-              <div className="flex items-center justify-center py-20 text-gray-400 gap-3">
-                <Loader2 className="h-7 w-7 animate-spin" />
-                <span className="text-lg">جاري تحميل الدورات...</span>
-              </div>
-            )}
-
-            {!loading && error && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4 text-red-500">
-                <AlertCircle className="h-10 w-10" />
-                <p>{error}</p>
-                <Button variant="outline" onClick={fetchData}>إعادة المحاولة</Button>
-              </div>
-            )}
-
-            {!loading && !error && visibleCourses.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-20 gap-4 text-gray-400 text-center">
-                <p className="text-lg">
-                  {searchQuery || selectedCategory !== "جميع الفئات"
-                    ? "لا توجد نتائج تطابق بحثك"
-                    : "لا توجد دورات نشطة حالياً"}
-                </p>
-              </div>
-            )}
-
-            {!loading && !error && visibleCourses.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {visibleCourses.map((course) => (
-                  <CourseCard
-                    key={course.id}
-                    id={course.id}
-                    title={course.title}
-                    description={course.shortDescription || course.description}
-                    level="عام" // Using a generic fallback for visually completing the design card
-                    price={course.price}
-                    studentsCount={course.studentsCount}
-                    duration={String(course.duration)}
-                    image={resolveImage(course.image)}
-                    category={course.category}
-                    courseStatus={course.courseStatus || (course as any).status}
-                    instructor={{
-                      name: course.trainer.name,
-                      avatar: resolveImage(course.trainer.avatar)
-                    }}
-                    instructors={(course as any).staffTrainers?.length > 1
-                      ? (course as any).staffTrainers.map((t: any) => ({ name: t.name, avatar: resolveImage(t.avatar) }))
-                      : undefined
-                    }
-                    basePath={basePath}
-                    isFavorite={wishlistIds.includes(course.id)}
-                    roomId={course.roomId}
-                    roomName={course.roomName}
-                    onRoomClick={() => {
-                      if (course.roomId) {
-                        setSelectedHallId(course.roomId)
-                        setIsHallModalOpen(true)
-                      }
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+            <p className="px-1 text-sm font-semibold text-slate-500 md:whitespace-nowrap">
+              {loading ? "جارِ التحميل..." : `تم العثور على ${courses.length} دورات`}
+            </p>
           </div>
         </div>
-      </div>
-      <HallDetailsModal 
-        isOpen={isHallModalOpen} 
-        onClose={setIsHallModalOpen} 
-        hallId={selectedHallId} 
-      />
-    </div>
 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {courses.map((course) => {
+            const isFavorite = favoriteIds.includes(course.id)
+
+            return (
+              <article
+                key={course.id}
+                className="group flex h-full min-h-[390px] flex-col overflow-hidden rounded-lg border border-slate-200/90 bg-white shadow-[0_10px_24px_rgba(15,23,42,0.06)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-slate-200/90 hover:shadow-[0_18px_36px_rgba(37,99,235,0.16)]"
+              >
+                <div className="relative h-[188px] overflow-hidden bg-slate-100 md:h-[196px]">
+                  <CourseImage src={resolveCourseImage(course.image)} alt={course.title} />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-900/25 via-slate-900/10 to-transparent transition-opacity duration-300 group-hover:opacity-90" />
+
+                  <div className="absolute left-3 top-3 z-10 flex flex-col gap-2">
+                    {course.courseStatus === "PENDING_MINIMUM" || (course as any).status === "PENDING_MINIMUM" ? (
+                      <span className="rounded-full border border-amber-200/50 bg-amber-500/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px]">
+                        بانتظار اكتمال العدد
+                      </span>
+                    ) : course.courseStatus === "ACTIVE" || (course as any).status === "ACTIVE" ? (
+                      <span className="rounded-full border border-emerald-200/50 bg-emerald-500/90 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm backdrop-blur-[2px]">
+                        مستمرة
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <span className="absolute bottom-3 right-3 rounded-full bg-white/86 px-2.5 py-1 text-[11px] font-semibold text-slate-700 backdrop-blur-[2px]">
+                    {course.category || "الفئة"}
+                  </span>
+                </div>
+
+                <div className="flex flex-1 flex-col p-3.5 text-right">
+                  <div className="space-y-1">
+                    <h3 className="line-clamp-2 text-[17px] font-extrabold leading-6 text-slate-900">{course.title}</h3>
+                    <p className="line-clamp-2 text-[12px] leading-5 text-slate-600">{course.shortDescription || course.description}</p>
+                  </div>
+
+                  <div className="mt-2.5 flex items-center justify-between text-[12px] font-medium text-slate-600">
+                    <div className="inline-flex items-center gap-1">
+                      <Users className="h-3.5 w-3.5 text-slate-500" />
+                      <span>{course.studentsCount} طالب</span>
+                    </div>
+                    <div className="inline-flex items-center gap-1">
+                      <CalendarDays className="h-3.5 w-3.5 text-slate-500" />
+                      <span>{course.sessionsCount} جلسات</span>
+                    </div>
+                    {course.deliveryType !== "in_person" && (
+                      <div className="inline-flex items-center gap-1">
+                        <Clock3 className="h-3.5 w-3.5 text-slate-500" />
+                        <span>{typeof course.duration === "number" ? course.duration : String(course.duration).replace(/[^\d]/g, "") || 0} ساعة</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-2 inline-flex items-center gap-2 text-[12px] text-slate-600">
+                    <div className="relative h-6 w-6 overflow-hidden rounded-full border border-slate-200 bg-blue-100">
+                      <Image
+                        src={creatorAvatar(course) || fallbackAvatarDataUri(creatorName(course))}
+                        alt={creatorName(course)}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                    <span className="line-clamp-1">{creatorName(course)}</span>
+                  </div>
+
+                  <div className="mt-auto pt-2.5">
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 px-1 pt-3">
+                      <div className="inline-flex items-center gap-2">
+                        <Link
+                          href={`${basePath}/${course.id}`}
+                          className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md bg-[#2563EB] px-4 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                        >
+                          عرض الدورة
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => toggleFavorite(course.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-red-500 shadow-sm transition-colors hover:bg-slate-50"
+                          aria-label="إضافة للمفضلة"
+                        >
+                          <Heart className={`h-4 w-4 ${isFavorite ? "fill-current" : ""}`} />
+                        </button>
+                      </div>
+                      <p className="whitespace-nowrap text-[20px] font-extrabold leading-none tracking-tight text-[#2563EB]">
+                        {formatPrice(course.price)} <span className="text-xs font-bold text-blue-500">ر.ي</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+      </div>
+    </section>
   )
 }
 
+export default function CoursesPage(props: CoursesPageProps) {
+  return (
+    <Suspense fallback={null}>
+      <CoursesPageContent {...props} />
+    </Suspense>
+  )
+}

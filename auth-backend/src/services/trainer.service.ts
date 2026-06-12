@@ -107,6 +107,42 @@ class TrainerService {
             status: b.status.toLowerCase(),
         }));
 
+        // Recent Enrollments
+        const recentEnrollmentsRaw = await prisma.enrollment.findMany({
+            where: {
+                course: { trainerId: userId },
+            },
+            include: {
+                course: { select: { title: true } },
+                student: { select: { name: true } },
+            },
+            orderBy: { enrolledAt: "desc" },
+            take: 5,
+        });
+
+        const recentEnrollments = recentEnrollmentsRaw.map(e => ({
+            id: e.id,
+            courseTitle: e.course?.title || "دورة",
+            studentName: e.student?.name || "طالب",
+            enrolledAt: e.enrolledAt,
+            status: e.status,
+        }));
+
+        // Recent Notifications
+        const recentNotificationsRaw = await prisma.notification.findMany({
+            where: { userId },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+        });
+
+        const recentNotifications = recentNotificationsRaw.map(n => ({
+            id: n.id,
+            title: n.title || "إشعار",
+            message: n.message || "",
+            createdAt: n.createdAt,
+            isRead: n.isRead,
+        }));
+
         return {
             stats: {
                 totalCourses,
@@ -119,6 +155,8 @@ class TrainerService {
             },
             upcomingSessions,
             pendingRoomBookings,
+            recentEnrollments,
+            recentNotifications,
         };
     }
 
@@ -140,6 +178,7 @@ class TrainerService {
 
         const where: any = {
             status: { in: ['ACTIVE', 'PENDING_MINIMUM'] },
+            deletedAt: null,
             AND: [],
         };
 
@@ -410,7 +449,7 @@ class TrainerService {
      */
     async getCourses(userId: string) {
         const courses = await prisma.course.findMany({
-            where: { trainerId: userId },
+            where: { trainerId: userId, deletedAt: null },
             include: {
                 category: { select: { name: true } },
                 _count: { select: { enrollments: true } },
@@ -458,7 +497,7 @@ class TrainerService {
      */
     async getTrainerCourseById(userId: string, courseId: string) {
         const course = await prisma.course.findFirst({
-            where: { id: courseId, trainerId: userId },
+            where: { id: courseId, trainerId: userId, deletedAt: null },
             include: {
                 category: { select: { id: true, name: true } },
                 _count: { select: { enrollments: true } },
@@ -695,15 +734,23 @@ class TrainerService {
         });
         if (!course) throw new Error('الدورة غير موجودة أو لا تنتمي لهذا المدرب');
 
-        // Delete associated sessions, room bookings, etc. (cascading handled by Prisma or manual)
-        // Note: In this schema, we might want to check for enrollments first.
-        const enrollmentCount = await prisma.enrollment.count({ where: { courseId } });
-        if (enrollmentCount > 0) {
-            throw new Error('لا يمكن حذف دورة بها طلاب مسجلون. يرجى إلغاء تسجيل الطلاب أولاً.');
+        const activeEnrollmentCount = await prisma.enrollment.count({
+            where: {
+                courseId,
+                status: {
+                    in: ['ACTIVE', 'PRELIMINARY', 'PRELIMINARY_APPROVED', 'PENDING_PAYMENT']
+                },
+                deletedAt: null
+            }
+        });
+
+        if (activeEnrollmentCount > 0) {
+            throw new Error('لا يمكن حذف دورة بها طلاب مستمرون أو قيد الانتظار. يرجى إلغاء الدورة أو إلغاء تسجيل الطلاب أولاً.');
         }
 
-        return prisma.course.delete({
+        return prisma.course.update({
             where: { id: courseId },
+            data: { deletedAt: new Date() },
         });
     }
 
@@ -1034,9 +1081,9 @@ class TrainerService {
     /**
      * Get a single ACTIVE course by ID for public viewing
      */
-    async getPublicCourseById(courseId: string) {
+    async getPublicCourseById(courseId: string, currentUserId?: string) {
         const course = await prisma.course.findFirst({
-            where: { id: courseId, status: { in: ['ACTIVE', 'PENDING_MINIMUM'] } },
+            where: { id: courseId, deletedAt: null },
             include: {
                 trainer: {
                     select: {
@@ -1078,6 +1125,7 @@ class TrainerService {
                 },
                 institute: {
                     select: {
+                        userId: true,
                         name: true,
                         logo: true,
                         email: true,
@@ -1086,6 +1134,7 @@ class TrainerService {
                         website: true,
                         locationUrl: true,
                         description: true,
+                        features: true,
                         user: { select: { avatar: true } },
                         bankAccounts: {
                             select: {
@@ -1103,6 +1152,15 @@ class TrainerService {
         });
 
         if (!course) throw new Error('الدورة غير موجودة أو غير متاحة للعرض');
+
+        const isOwner = currentUserId && (
+            course.trainerId === currentUserId ||
+            (course as any).institute?.userId === currentUserId
+        );
+
+        if (!isOwner && !['ACTIVE', 'PENDING_MINIMUM'].includes(course.status)) {
+            throw new Error('الدورة غير موجودة أو غير متاحة للعرض');
+        }
 
         const sessions = (course as any).sessions as any[];
         const sessionsCount = sessions.length;
@@ -1180,10 +1238,11 @@ class TrainerService {
                 website: (course as any).institute.website,
                 locationUrl: (course as any).institute.locationUrl,
                 description: (course as any).institute.description,
+                features: (course as any).institute.features ?? [],
             } : null,
             instructor: {
                 name: (course as any).trainer?.name ?? (staffTrainers.length > 0 ? staffTrainers[0].name : ((course as any).institute?.name ?? 'مدرب')),
-                avatar: (course as any).trainer?.avatar ?? ((course as any).institute?.logo ?? (course as any).institute?.user?.avatar ?? null),
+                avatar: (course as any).trainer?.avatar ?? (staffTrainers.length > 0 ? staffTrainers[0].avatar : ((course as any).institute?.logo ?? (course as any).institute?.user?.avatar ?? null)),
                 email: (course as any).trainer?.email ?? (staffTrainers.length > 0 ? staffTrainers[0].email : ((course as any).institute?.email ?? null)),
                 phone: (course as any).trainer?.phone ?? (staffTrainers.length > 0 ? staffTrainers[0].phone : ((course as any).institute?.phone ?? null)),
                 bio: (course as any).trainer?.trainerProfile?.bio ?? (staffTrainers.length > 0 ? staffTrainers[0].bio : ((course as any).institute?.description ?? null)),

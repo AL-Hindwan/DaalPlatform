@@ -16,10 +16,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
-import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, AlertTriangle, Banknote, Lock, Loader2, Landmark, Heart, BookOpen, Target, ListChecks, Tags, Lightbulb } from "lucide-react"
+import { Save, Send, Trash2, ArrowLeft, X, MapPin, Users, Building, Globe, Plus, Calendar, Clock, CheckCircle, AlertCircle, AlertTriangle, Banknote, Lock, Loader2, Landmark, Heart, BookOpen, Target, ListChecks, Tags, Lightbulb, Bell } from "lucide-react"
 import { toast } from "sonner"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { formatNumber, getFileUrl } from "@/lib/utils"
+import { getCourseEditPermissions } from "@/lib/course-edit-permissions"
+import { CourseStatusBanner } from "@/components/courses/CourseStatusBanner"
+import { BookingSectionLocked } from "@/components/courses/BookingSectionLocked"
 
 
 const platforms = [
@@ -57,6 +60,11 @@ export default function EditCoursePage() {
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [activeTab, setActiveTab] = useState("info")
     const [lastDraftSavedAt, setLastDraftSavedAt] = useState<Date | null>(null)
+
+    // Course Lifecycle State
+    const [courseStatus, setCourseStatus] = useState<string>('DRAFT')
+    const [enrolledCount, setEnrolledCount] = useState(0)
+    const [minStudentsCount, setMinStudentsCount] = useState(1)
 
     // Reference Data State
     const [categories, setCategories] = useState<{ id: string, name: string }[]>([])
@@ -217,6 +225,11 @@ export default function EditCoursePage() {
                     prerequisites: course.prerequisites || [],
                     tags: course.tags || [],
                 })
+
+                // Store lifecycle state
+                setCourseStatus(course.status || 'DRAFT')
+                setEnrolledCount(course.enrolledCount ?? 0)
+                setMinStudentsCount(Number(course.minStudents) || 1)
 
                 if (course.image) {
                     const imageUrl = getFileUrl(course.image)
@@ -606,6 +619,56 @@ export default function EditCoursePage() {
         })
     }
 
+    /**
+     * نشر وإعلام الطلاب (pending_min_ready → ACTIVE)
+     * 1. يحفظ الجلسات المضافة أولاً
+     * 2. يستدعي /activate لتحويل الطلاب وإرسال الإشعارات
+     */
+    const handleActivateCourse = async () => {
+        try {
+            setIsSubmitting(true)
+
+            // التحقق من وجود جلسات
+            if (courseData.deliveryType === 'online') {
+                const validSessions = onlineSessions.filter(s => s.date && s.startTime)
+                if (validSessions.length === 0) {
+                    toast.error('يجب إضافة جلسة واحدة على الأقل مع تحديد التاريخ والوقت')
+                    setIsSubmitting(false)
+                    return
+                }
+            } else if (courseData.deliveryType === 'in_person') {
+                if (selectedSessions.length === 0) {
+                    toast.error('يجب اختيار جلسة واحدة على الأقل من التقويم')
+                    setIsSubmitting(false)
+                    return
+                }
+                if (!paymentFile) {
+                    toast.error('يجب إرفاق سند الدفع لحجز القاعة')
+                    setIsSubmitting(false)
+                    return
+                }
+            } else if (!courseData.deliveryType) {
+                toast.error('يجب اختيار نوع التنفيذ أولاً')
+                setIsSubmitting(false)
+                return
+            }
+
+            // حفظ الجلسات عبر PUT (بدون تغيير status)
+            await handleSubmit('PENDING_MINIMUM')
+
+            // تفعيل الدورة وإشعار الطلاب
+            await trainerService.activateCourse(courseId)
+
+            toast.success('🎉 تم نشر الدورة وإعلام الطلاب بنجاح!')
+            router.push('/trainer/courses')
+        } catch (err: any) {
+            const backendMessage = err?.response?.data?.message
+            toast.error(backendMessage || err?.message || 'حدث خطأ أثناء تفعيل الدورة')
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
     const handleDeleteCourse = async () => {
         try {
             setIsSubmitting(true)
@@ -632,7 +695,7 @@ export default function EditCoursePage() {
     }
 
     // --- Validation ---
-    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents);
+    const isInfoValid = courseData.title && courseData.categoryId && courseData.description && courseData.price && courseData.minStudents && courseData.maxStudents && Number(courseData.minStudents) <= Number(courseData.maxStudents) && (imageFile || imagePreview);
     const isLocationValid = () => {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
@@ -645,6 +708,13 @@ export default function EditCoursePage() {
     const selectedCategoryName = categories.find((c) => c.id === courseData.categoryId)?.name || "الفئة"
     const previewTitle = courseData.title.trim() || "عنوان الدورة سيظهر هنا"
     const previewShortDesc = courseData.shortDescription.trim() || "وصف الدورة المختصر سيظهر هنا"
+
+    // --- Permissions (computed from course status) ---
+    const permissions = getCourseEditPermissions(courseStatus, enrolledCount, minStudentsCount)
+    const isFieldLocked = (field: string) =>
+        permissions.isReadOnly ||
+        permissions.lockedCourseInfoFields.includes('*') ||
+        permissions.lockedCourseInfoFields.includes(field)
 
     if (loading) {
         return <div className="flex h-96 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
@@ -685,6 +755,13 @@ export default function EditCoursePage() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">تعديل الدورة التدريبية</h1>
                 <p className="text-gray-600">حدّث بيانات الدورة وجدولها ثم احفظ التغييرات</p>
             </div>
+
+            {/* شريط حالة الدورة */}
+            <CourseStatusBanner
+                state={permissions.state}
+                enrolledCount={enrolledCount}
+                minStudents={minStudentsCount}
+            />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full space-y-6">
                 <div className="w-full rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-[0_6px_18px_rgba(15,23,42,0.06)]">
@@ -751,10 +828,12 @@ export default function EditCoursePage() {
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">عنوان الدورة <span className="text-red-500">*</span></Label>
                                                 <Input value={courseData.title} onChange={e => setCourseData({ ...courseData, title: e.target.value })} placeholder="مثال: تعلم React" />
+                                                {showInfoErrors && !courseData.title.trim() && <p className="text-xs text-red-500 text-right mt-1">يرجى إدخال عنوان الدورة.</p>}
                                             </div>
                                             <div className="space-y-2.5 pr-2 sm:pr-3 lg:pr-4">
                                                 <Label className="font-semibold">الفئة <span className="text-red-500">*</span></Label>
                                                 <Select
+                                                    disabled={isFieldLocked('categoryId')}
                                                     value={courseData.categoryId}
                                                     onValueChange={v => {
                                                         if (v === '__add_new__') setIsAddingCategory(true)
@@ -791,7 +870,7 @@ export default function EditCoursePage() {
                                         <div className="space-y-2.5 lg:order-1" dir="rtl">
                                             <Label className="font-semibold">صورة الدورة <span className="text-red-500">*</span></Label>
                                             <div className="w-full">
-                                                <div className="relative h-[188px] w-full max-w-[420px] cursor-pointer overflow-hidden rounded-md border-2 border-dashed border-gray-300 bg-gray-50 transition-colors hover:bg-gray-100 md:h-[196px]" onClick={() => fileInputRef.current?.click()}>
+                                                <div className="relative h-[188px] w-full max-w-[420px] cursor-pointer overflow-hidden rounded-md border-2 border-dashed border-gray-300 bg-gray-50 transition-colors hover:bg-gray-100 md:h-[196px]" onClick={() => !isFieldLocked('image') && fileInputRef.current?.click()}>
                                                     {imagePreview ? <Image src={imagePreview} alt="Course Preview" fill unoptimized className="object-cover object-center" /> : (
                                                         <div className="flex h-full flex-col items-center justify-center text-gray-400 text-center px-3">
                                                             <Plus className="mb-2 h-8 w-8" />
@@ -902,6 +981,7 @@ export default function EditCoursePage() {
                                         <Label>أقصى عدد مقاعد <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="number"
+                                            disabled={isFieldLocked('maxStudents')}
                                             value={courseData.maxStudents}
                                             onChange={e => setCourseData({ ...courseData, maxStudents: e.target.value })}
                                             onKeyDown={preventNumberSteppers}
@@ -913,6 +993,7 @@ export default function EditCoursePage() {
                                         <Label>أقل عدد مقاعد <span className="text-red-500">*</span></Label>
                                         <Input
                                             type="number"
+                                            disabled={isFieldLocked('minStudents')}
                                             value={courseData.minStudents}
                                             onChange={e => setCourseData({ ...courseData, minStudents: e.target.value })}
                                             onKeyDown={preventNumberSteppers}
@@ -925,6 +1006,7 @@ export default function EditCoursePage() {
                                         <Input
                                             type="text"
                                             inputMode="numeric"
+                                            disabled={isFieldLocked('price')}
                                             value={formatNumberWithCommas(courseData.price)}
                                             onChange={e => setCourseData({ ...courseData, price: e.target.value.replace(/[^\d]/g, "") })}
                                             onKeyDown={preventNumberSteppers}
@@ -1054,7 +1136,7 @@ export default function EditCoursePage() {
 
                     <div className="mt-4 flex items-center justify-between pt-4 xl:ml-auto xl:w-[72%]">
                         <div className="flex items-center gap-3">
-                            {Number(courseData.minStudents) > 1 && (
+                            {permissions.showPublishCourse && Number(courseData.minStudents) > 1 && (
                                 <Button variant="outline" onClick={() => handleSubmit('PENDING_MINIMUM')} disabled={isSubmitting || !isInfoValid} className="gap-2 border-purple-300 text-purple-700 hover:border-purple-400 hover:bg-purple-50">
                                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />} نشر بانتظار الحد الأدنى
                                 </Button>
@@ -1073,9 +1155,18 @@ export default function EditCoursePage() {
                                 التالي<ArrowLeft className="mr-2 h-4 w-4" />
                             </Button>
                         </div>
-                        <Button variant="outline" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting} className="text-gray-700">
-                            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ كمسودة
-                        </Button>
+                        <div className="flex gap-2">
+                            {permissions.showSaveAsDraft && (
+                                <Button variant="outline" onClick={() => handleSubmit('DRAFT')} disabled={isSubmitting} className="text-gray-700">
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ كمسودة
+                                </Button>
+                            )}
+                            {permissions.showSaveChanges && (
+                                <Button onClick={() => handleSubmit(courseStatus as any)} disabled={isSubmitting || !isInfoValid}>
+                                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} حفظ التغييرات
+                                </Button>
+                            )}
+                        </div>
                     </div>
                 </TabsContent>
 
@@ -1084,7 +1175,7 @@ export default function EditCoursePage() {
                     <Card>
                         <CardHeader><CardTitle>طريقة الانعقاد</CardTitle></CardHeader>
                         <CardContent>
-                            <RadioGroup value={courseData.deliveryType} onValueChange={v => setCourseData({ ...courseData, deliveryType: v })} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <RadioGroup disabled={isFieldLocked('deliveryType')} value={courseData.deliveryType} onValueChange={v => setCourseData({ ...courseData, deliveryType: v })} className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <label className={`border rounded-lg p-4 cursor-pointer flex flex-col items-center gap-2 ${courseData.deliveryType === 'online' ? 'border-blue-600 bg-blue-50' : ''}`}>
                                     <RadioGroupItem value="online" className="sr-only" />
                                     <Globe className="h-6 w-6 text-blue-600" />
@@ -1105,7 +1196,7 @@ export default function EditCoursePage() {
                     </Card>
 
                     {/* In-Person Flow */}
-                    {courseData.deliveryType === 'in_person' && (
+                    {courseData.deliveryType === 'in_person' && permissions.canEditBookingSection && (
                         <div className="space-y-6">
                             <Card>
                                 <CardHeader><CardTitle>اختيار القاعة</CardTitle></CardHeader>
@@ -1551,7 +1642,7 @@ export default function EditCoursePage() {
                     )}
 
                     {/* Online Flow */}
-                    {courseData.deliveryType === 'online' && (
+                    {courseData.deliveryType === 'online' && permissions.canEditBookingSection && (
                         <div className="space-y-6">
                             {/* Platform & Meeting Link */}
                             <Card>
@@ -1633,12 +1724,65 @@ export default function EditCoursePage() {
                         </div>
                     )}
 
+                    {/* قسم الحجز مغلق */}
+                    {!permissions.canEditBookingSection && (
+                        <BookingSectionLocked reason={permissions.bookingLockedReason} />
+                    )}
+
                     <div className="flex justify-between pt-6 border-t mt-8">
-                        <div className="flex gap-2">
-                            <Button onClick={() => handleSubmit('ACTIVE')} disabled={!isInfoValid || !isLocationValid() || isSubmitting}>
-                                {isSubmitting ? <Loader2 className="animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                {courseData.deliveryType === 'in_person' ? 'إرسال للمراجعة' : 'حفظ التعديلات'}
-                            </Button>
+                        <div className="flex gap-2 flex-wrap">
+                            {/* زر حفظ كمسودة */}
+                            {permissions.showSaveAsDraft && (
+                                <Button
+                                    variant="outline"
+                                    onClick={() => handleSubmit('DRAFT')}
+                                    disabled={isSubmitting}
+                                    id="btn-save-draft"
+                                >
+                                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    حفظ كمسودة
+                                </Button>
+                            )}
+
+                            {/* زر نشر الدورة (draft → pending_minimum) */}
+                            {permissions.showPublishCourse && (
+                                <Button
+                                    onClick={() => handleSubmit('PENDING_MINIMUM')}
+                                    disabled={!isInfoValid || isSubmitting}
+                                    id="btn-publish-course"
+                                >
+                                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+                                    نشر الدورة
+                                </Button>
+                            )}
+
+                            {/* زر حفظ التغييرات (pending_min_waiting / active) */}
+                            {permissions.showSaveChanges && (
+                                <Button
+                                    onClick={() => handleSubmit(courseStatus as any)}
+                                    disabled={isSubmitting}
+                                    id="btn-save-changes"
+                                >
+                                    {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                                    حفظ التغييرات
+                                </Button>
+                            )}
+
+                            {/* زر نشر وإعلام الطلاب (pending_min_ready → active) */}
+                            {permissions.showPublishAndNotify && (
+                                <Button
+                                    onClick={handleActivateCourse}
+                                    disabled={isSubmitting}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    id="btn-publish-notify"
+                                >
+                                    {isSubmitting
+                                        ? <Loader2 className="h-4 w-4 animate-spin" />
+                                        : <Bell className="mr-2 h-4 w-4" />
+                                    }
+                                    نشر وإعلام الطلاب
+                                </Button>
+                            )}
                         </div>
                         <Button variant="outline" onClick={() => setActiveTab("info")}>السابق</Button>
                     </div>
