@@ -131,6 +131,7 @@ interface Hall {
     website: string
   }
   bankAccounts?: any[]
+  blackoutPeriods?: any[]
 }
 
 export default function HallDetailsPage() {
@@ -163,7 +164,8 @@ export default function HallDetailsPage() {
             email: data.institute?.email || "",
             address: data.institute?.address || "",
             website: data.institute?.website || "",
-          }
+          },
+          blackoutPeriods: Array.isArray(data.availability?.blackoutPeriods) ? data.availability.blackoutPeriods : []
         }
         setHall(mappedHall)
       } catch (err: any) {
@@ -200,6 +202,7 @@ export default function HallDetailsPage() {
   const [availableSlots, setAvailableSlots] = useState<string[]>([])
   const [isFetchingSlots, setIsFetchingSlots] = useState(false)
   const [hallAvailabilityData, setHallAvailabilityData] = useState<any>(null)
+  const [unavailableMessage, setUnavailableMessage] = useState("")
 
   // Global availability fetch removed. Per-date fetch in handleDateSelect.
   useEffect(() => {
@@ -207,6 +210,7 @@ export default function HallDetailsPage() {
     setSelectedSlotsByDate({})
     setActiveDate(null)
     setAvailableSlots([])
+    setUnavailableMessage("")
   }, [hallId])
 
   const resolveHallBooking = useCallback((bookings: any[]) => {
@@ -264,6 +268,18 @@ export default function HallDetailsPage() {
   const formatTime = (hour: number) => `${String(hour).padStart(2, "0")}:00`
   const isPastDate = (date: Date) => date.setHours(0, 0, 0, 0) < new Date().setHours(0, 0, 0, 0)
 
+  const getBlackoutPeriodForDate = (dateKey: string) => {
+    const dDate = new Date(dateKey)
+    dDate.setHours(12, 0, 0, 0)
+    return hall?.blackoutPeriods?.find((bp: any) => {
+        const start = new Date(bp.startDate)
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(bp.endDate)
+        end.setHours(23, 59, 59, 999)
+        return dDate >= start && dDate <= end
+    })
+  }
+
   const handleDateSelect = async (dateKey: string) => {
     if (receiptFile || receiptPreview || receiptInfo.name) {
       if (receiptPreview) URL.revokeObjectURL(receiptPreview)
@@ -274,6 +290,13 @@ export default function HallDetailsPage() {
     }
     setActiveDate(dateKey)
     setAvailableSlots([])
+    setUnavailableMessage("")
+
+    const blackout = getBlackoutPeriodForDate(dateKey)
+    if (blackout) {
+        setUnavailableMessage(`فترة غير متاحة: ${blackout.label || 'صيانة أو حجز مسبق'}`)
+        return
+    }
 
     if (!selectedSlotsByDate[dateKey]) {
       setSelectedSlotsByDate(prev => ({ ...prev, [dateKey]: [] }))
@@ -735,6 +758,7 @@ export default function HallDetailsPage() {
                         const isSelected = activeDate === dateKey
                         const isToday = formatDateKey(new Date()) === dateKey
                         const hasSelection = (selectedSlotsByDate[dateKey]?.length ?? 0) > 0
+                        const blackout = getBlackoutPeriodForDate(dateKey)
                         return (
                           <button
                             key={dateKey}
@@ -746,9 +770,11 @@ export default function HallDetailsPage() {
                                 ? "z-10 bg-blue-600 text-white shadow-sm"
                                 : disabled
                                   ? "cursor-not-allowed bg-slate-50 text-slate-300"
-                                  : hasSelection
-                                    ? "border-2 border-blue-200 bg-blue-50 text-blue-700"
-                                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                  : blackout
+                                    ? "bg-red-50 text-red-500 border-red-200 border hover:bg-red-100"
+                                    : hasSelection
+                                      ? "border-2 border-blue-200 bg-blue-50 text-blue-700"
+                                      : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                             }`}
                           >
                             {day}
@@ -792,7 +818,7 @@ export default function HallDetailsPage() {
                             })}
                           </div>
                         ) : (
-                          <div className="flex flex-1 flex-col items-center justify-center rounded-[6.5px] border border-dashed border-slate-200 text-slate-400"><Lock className="mb-2 h-8 w-8 opacity-20" /><p className="text-sm">لا توجد فترات متاحة لهذا اليوم</p></div>
+                          <div className="flex flex-1 flex-col items-center justify-center rounded-[6.5px] border border-dashed border-slate-200 text-slate-400"><Lock className="mb-2 h-8 w-8 opacity-20" /><p className="text-sm">{unavailableMessage || "لا توجد فترات متاحة لهذا اليوم"}</p></div>
                         )}
                       </div>
                     )}

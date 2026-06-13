@@ -357,7 +357,30 @@ export default function EditCoursePage() {
     }
     while (calendarDays.length % 7 !== 0) calendarDays.push(null)
 
+    const rawSelectedHall = halls.find(h => h.id === courseData.hallId)
+    const blackoutPeriods = rawSelectedHall?.availability?.blackoutPeriods || []
+
+    const getBlackoutPeriodForDate = (dateKey: string) => {
+        const dDate = new Date(dateKey)
+        dDate.setHours(12, 0, 0, 0)
+        return blackoutPeriods.find((bp: any) => {
+            const start = new Date(bp.startDate)
+            start.setHours(0, 0, 0, 0)
+            const end = new Date(bp.endDate)
+            end.setHours(23, 59, 59, 999)
+            return dDate >= start && dDate <= end
+        })
+    }
+
     const handleSelectDay = async (dateKey: string) => {
+        const blackout = getBlackoutPeriodForDate(dateKey)
+        if (blackout) {
+            setSelectedDate(dateKey)
+            setUnavailableMessage(`فترة غير متاحة: ${blackout.label || 'صيانة أو حجز مسبق'}`)
+            setAvailableSlots([])
+            return
+        }
+
         setSelectedDate(dateKey)
         setUnavailableMessage("")
         setAvailableSlots([])
@@ -1319,6 +1342,7 @@ export default function EditCoursePage() {
                                                     if (!d) return <div key={i} />
                                                     const isSelected = selectedDate === d.dateKey
                                                     const hasSessions = selectedSessions.some(s => s.date === d.dateKey)
+                                                    const blackout = getBlackoutPeriodForDate(d.dateKey)
                                                     return (
                                                         <button
                                                             key={i}
@@ -1328,6 +1352,7 @@ export default function EditCoursePage() {
                                                             className={`h-10 rounded-lg text-sm transition-all
                                                         ${isSelected ? 'bg-blue-600 text-white' :
                                                                     d.isPast ? 'bg-gray-100 text-gray-300' :
+                                                                        blackout ? 'bg-red-50 text-red-500 border-red-200 border hover:bg-red-100' :
                                                                         hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
                                                                 }`}
                                                         >
