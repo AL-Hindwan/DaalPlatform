@@ -14,7 +14,7 @@ import { authService } from "@/lib/auth-service"
 import { toast } from "sonner"
 import { useEffect, useRef } from "react"
 import { Camera } from "lucide-react"
-import { isValidEmail } from "@/lib/utils"
+import { isValidEmail, PROFILE_IMAGE_MAX_SIZE_BYTES, PROFILE_IMAGE_MAX_SIZE_MB } from "@/lib/utils"
 
 export default function AdminProfilePage() {
     const { user, updateUser } = useAuth()
@@ -49,6 +49,11 @@ export default function AdminProfilePage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (file.size > PROFILE_IMAGE_MAX_SIZE_BYTES) {
+                toast.error(`حجم الصورة يجب ألا يتجاوز ${PROFILE_IMAGE_MAX_SIZE_MB}MB`)
+                e.target.value = ""
+                return
+            }
             setSelectedFile(file)
             const url = URL.createObjectURL(file)
             setPreviewUrl(url)

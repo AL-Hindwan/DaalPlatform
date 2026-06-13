@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { User as UserIcon, Mail, Phone, Eye, EyeOff, Loader2, Camera, Edit3, Lock, ShieldCheck, UserCircle2 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
-import { getFileUrl, isValidEmail } from "@/lib/utils"
+import { getFileUrl, isValidEmail, PROFILE_IMAGE_MAX_SIZE_BYTES, PROFILE_IMAGE_MAX_SIZE_MB } from "@/lib/utils"
 import { authService } from "@/lib/auth-service"
 import { toast } from "sonner"
 
@@ -48,6 +48,11 @@ export default function StudentProfilePage() {
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
+      if (file.size > PROFILE_IMAGE_MAX_SIZE_BYTES) {
+        toast.error(`حجم الصورة يجب ألا يتجاوز ${PROFILE_IMAGE_MAX_SIZE_MB}MB`)
+        e.target.value = ""
+        return
+      }
       setSelectedAvatar(file)
       const reader = new FileReader()
       reader.onloadend = () => {

@@ -15,7 +15,7 @@ import { User, Mail, Phone, Eye, EyeOff, Loader2, Camera, X, Plus, ShieldCheck, 
 import { toast } from "sonner"
 import { trainerService } from "@/lib/trainer-service"
 import { useAuth } from "@/contexts/auth-context"
-import { isValidEmail } from "@/lib/utils"
+import { isValidEmail, PROFILE_IMAGE_MAX_SIZE_BYTES, PROFILE_IMAGE_MAX_SIZE_MB } from "@/lib/utils"
 
 type ProfileData = {
     id: string
@@ -211,6 +211,11 @@ export default function TrainerProfilePage() {
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
+            if (file.size > PROFILE_IMAGE_MAX_SIZE_BYTES) {
+                toast.error(`حجم الصورة يجب ألا يتجاوز ${PROFILE_IMAGE_MAX_SIZE_MB}MB`)
+                e.target.value = ""
+                return
+            }
             setAvatarFile(file)
             setAvatarPreview(URL.createObjectURL(file))
         }

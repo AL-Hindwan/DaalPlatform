@@ -34,7 +34,7 @@ import {
 import { toast } from "sonner"
 import { instituteService } from "@/lib/institute-service"
 import { authService } from "@/lib/auth-service"
-import { getFileUrl, isValidEmail } from "@/lib/utils"
+import { getFileUrl, isValidEmail, PROFILE_IMAGE_MAX_SIZE_BYTES, PROFILE_IMAGE_MAX_SIZE_MB } from "@/lib/utils"
 import { useAuth } from "@/contexts/auth-context"
 
 type BankAccount = {
@@ -312,8 +312,8 @@ export default function InstituteProfilePage() {
       setLogoError("صيغة الصورة غير مدعومة")
       return
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setLogoError("حجم الصورة يجب ألا يتجاوز 5MB")
+    if (file.size > PROFILE_IMAGE_MAX_SIZE_BYTES) {
+      setLogoError(`حجم الصورة يجب ألا يتجاوز ${PROFILE_IMAGE_MAX_SIZE_MB}MB`)
       return
     }
 
@@ -856,5 +856,4 @@ export default function InstituteProfilePage() {
     </div>
   )
 }
-
 

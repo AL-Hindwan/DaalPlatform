@@ -1,6 +1,9 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 
+export const PROFILE_IMAGE_MAX_SIZE_MB = 6
+export const PROFILE_IMAGE_MAX_SIZE_BYTES = PROFILE_IMAGE_MAX_SIZE_MB * 1024 * 1024
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
