@@ -120,7 +120,7 @@ export function getCourseEditPermissions(
         return {
             state: 'active',
             canEditCourseInfo: true,
-            lockedCourseInfoFields: [],
+            lockedCourseInfoFields: ['deliveryType'], // لا يمكن تغيير نوع الدورة بعد أن تصبح نشطة
             canEditBookingSection: isOnline,
             bookingLockedReason: isOnline ? undefined : 'الدورة نشطة والطلاب مسجلون. لا يمكن تعديل الجدول الزمني أو القاعة لتجنب الإرباك.',
             showSaveAsDraft: false,

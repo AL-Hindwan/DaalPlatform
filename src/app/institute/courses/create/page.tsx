@@ -181,9 +181,9 @@ function CreateCoursePageInner() {
                 const filtered = prev.filter(t => t.id !== newTag.id && t.name !== newTag.name)
                 return [...filtered, newTag].sort((a, b) => a.name.localeCompare(b.name))
             })
-            setCourseData(prev => ({ 
-                ...prev, 
-                tags: prev.tags.includes(newTag.name) ? prev.tags : [...prev.tags, newTag.name] 
+            setCourseData(prev => ({
+                ...prev,
+                tags: prev.tags.includes(newTag.name) ? prev.tags : [...prev.tags, newTag.name]
             }))
             setNewTagInput("")
             toast.success(`تم إضافة الوسم "${newTag.name}" بنجاح`)
@@ -670,8 +670,8 @@ function CreateCoursePageInner() {
                 status === 'DRAFT'
                     ? (isEditMode ? 'تم حفظ تعديلات المسودة بنجاح' : 'تم حفظ المسودة بنجاح')
                     : status === 'PENDING_MINIMUM'
-                      ? (isEditMode ? 'تم تحديث الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' : 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد')
-                      : (isEditMode ? 'تم تحديث الدورة بنجاح' : 'تم إنشاء الدورة بنجاح')
+                        ? (isEditMode ? 'تم تحديث الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد' : 'تم نشر الدورة! ستُفعّل عند اكتمال الحد الأدنى وإكمال الإعداد')
+                        : (isEditMode ? 'تم تحديث الدورة بنجاح' : 'تم إنشاء الدورة بنجاح')
             );
             router.push('/institute/courses');
 
@@ -730,7 +730,7 @@ function CreateCoursePageInner() {
         if (courseData.deliveryType === 'in_person') return !!courseData.hallId && selectedSessions.length > 0;
         if (courseData.deliveryType === 'online') return onlineSessions.some(s => s.date && s.startTime);
         if (courseData.deliveryType === 'flexible') return !!courseData.startDate;
-        return true; 
+        return true;
     }
     const shortDescriptionMax = 100
     const shortDescriptionCount = courseData.shortDescription.length
@@ -743,10 +743,10 @@ function CreateCoursePageInner() {
     // --- Permissions ---
     const effectiveStatus = isEditMode ? courseStatus : 'DRAFT'
     const permissions = getCourseEditPermissions(effectiveStatus, enrolledCount, minStudentsCount, courseData.deliveryType)
-    const isFieldLocked = (field: string) => 
+    const isFieldLocked = (field: string) =>
         isEditMode && (
-            permissions.isReadOnly || 
-            permissions.lockedCourseInfoFields.includes('*') || 
+            permissions.isReadOnly ||
+            permissions.lockedCourseInfoFields.includes('*') ||
             permissions.lockedCourseInfoFields.includes(field)
         )
 
@@ -1409,7 +1409,7 @@ function CreateCoursePageInner() {
                                                         ${isSelected ? 'bg-blue-600 text-white' :
                                                                     d.isPast ? 'bg-gray-100 text-gray-300' :
                                                                         blackout ? 'bg-red-50 text-red-500 border-red-200 border hover:bg-red-100' :
-                                                                        hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
+                                                                            hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
                                                                 }`}
                                                         >
                                                             {d.day}
@@ -1475,11 +1475,10 @@ function CreateCoursePageInner() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setLabelingMode('individual')}
-                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                                                                    labelingMode === 'individual'
-                                                                        ? 'border-blue-600 bg-blue-600 text-white'
-                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                                                                }`}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${labelingMode === 'individual'
+                                                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                    }`}
                                                             >
                                                                 <CheckCircle className="h-4 w-4" />
                                                                 عنونة كل جلسة على حدة
@@ -1487,11 +1486,10 @@ function CreateCoursePageInner() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setLabelingMode('grouped')}
-                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                                                                    labelingMode === 'grouped'
-                                                                        ? 'border-blue-600 bg-blue-600 text-white'
-                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                                                                }`}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${labelingMode === 'grouped'
+                                                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                    }`}
                                                             >
                                                                 <ListChecks className="h-4 w-4" />
                                                                 عنونة مجموعة جلسات
@@ -1609,11 +1607,10 @@ function CreateCoursePageInner() {
                                                                                             <Badge variant="secondary" className="rounded-[6.5px] bg-slate-100 text-slate-700 shadow-none text-xs">{s.slot}</Badge>
                                                                                         </td>
                                                                                         <td className="px-3 py-1.5">
-                                                                                            <span className={`text-xs font-medium ${
-                                                                                                getEffectiveTopic(idx + 1) === 'جلسة حضورية'
-                                                                                                    ? 'text-slate-400 italic'
-                                                                                                    : 'text-blue-700'
-                                                                                            }`}>
+                                                                                            <span className={`text-xs font-medium ${getEffectiveTopic(idx + 1) === 'جلسة حضورية'
+                                                                                                ? 'text-slate-400 italic'
+                                                                                                : 'text-blue-700'
+                                                                                                }`}>
                                                                                                 {getEffectiveTopic(idx + 1)}
                                                                                             </span>
                                                                                         </td>
@@ -1639,80 +1636,80 @@ function CreateCoursePageInner() {
                                                         </CardHeader>
                                                         <CardContent className="space-y-6">
 
-                                                        <div className="space-y-3">
-                                                            <h4 className="text-sm font-semibold text-gray-700">الحسابات البنكية للمعهد</h4>
-                                                            {selectedHall?.bankAccounts && selectedHall.bankAccounts.length > 0 ? (
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                                    {selectedHall.bankAccounts.map((bank: any) => (
-                                                                        <div key={bank.id} className="relative overflow-hidden group p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow border-gray-100">
-                                                                            <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-600"></div>
-                                                                            <div className="flex items-center gap-3 mb-4">
-                                                                                <div className="h-10 w-10 bg-blue-50/80 rounded-full flex items-center justify-center text-blue-600 shrink-0">
-                                                                                    <Landmark className="h-5 w-5" />
-                                                                                </div>
-                                                                                <div>
-                                                                                    <h5 className="font-bold text-gray-900 leading-tight">{bank.bankName}</h5>
-                                                                                    <p className="text-xs text-gray-500 mt-1">{bank.accountName}</p>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="space-y-2 bg-gray-50 p-3 rounded-[6.5px] border border-gray-100/60">
-                                                                                <div className="flex justify-between items-center text-sm">
-                                                                                    <span className="text-xs text-gray-500 font-medium">رقم الحساب</span>
-                                                                                    <span className="font-mono font-semibold text-blue-900" dir="ltr">{bank.accountNumber}</span>
-                                                                                </div>
-                                                                                {bank.iban && (
-                                                                                    <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
-                                                                                        <span className="text-xs text-gray-500 font-medium">IBAN</span>
-                                                                                        <span className="font-mono text-xs font-semibold text-gray-700" dir="ltr">{bank.iban}</span>
+                                                            <div className="space-y-3">
+                                                                <h4 className="text-sm font-semibold text-gray-700">الحسابات البنكية للمعهد</h4>
+                                                                {selectedHall?.bankAccounts && selectedHall.bankAccounts.length > 0 ? (
+                                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                                        {selectedHall.bankAccounts.map((bank: any) => (
+                                                                            <div key={bank.id} className="relative overflow-hidden group p-4 border rounded-xl bg-white shadow-sm hover:shadow-md transition-shadow border-gray-100">
+                                                                                <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-600"></div>
+                                                                                <div className="flex items-center gap-3 mb-4">
+                                                                                    <div className="h-10 w-10 bg-blue-50/80 rounded-full flex items-center justify-center text-blue-600 shrink-0">
+                                                                                        <Landmark className="h-5 w-5" />
                                                                                     </div>
-                                                                                )}
+                                                                                    <div>
+                                                                                        <h5 className="font-bold text-gray-900 leading-tight">{bank.bankName}</h5>
+                                                                                        <p className="text-xs text-gray-500 mt-1">{bank.accountName}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="space-y-2 bg-gray-50 p-3 rounded-[6.5px] border border-gray-100/60">
+                                                                                    <div className="flex justify-between items-center text-sm">
+                                                                                        <span className="text-xs text-gray-500 font-medium">رقم الحساب</span>
+                                                                                        <span className="font-mono font-semibold text-blue-900" dir="ltr">{bank.accountNumber}</span>
+                                                                                    </div>
+                                                                                    {bank.iban && (
+                                                                                        <div className="flex justify-between items-center text-sm pt-2 border-t border-gray-200">
+                                                                                            <span className="text-xs text-gray-500 font-medium">IBAN</span>
+                                                                                            <span className="font-mono text-xs font-semibold text-gray-700" dir="ltr">{bank.iban}</span>
+                                                                                        </div>
+                                                                                    )}
+                                                                                </div>
                                                                             </div>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded-[6.5px] border border-dashed">
+                                                                        لا توجد حسابات بنكية مضافة لهذا المعهد حاليًا. يمكنك التواصل مع المعهد مباشرة.
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <div
+                                                                className="relative h-48 w-full rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer overflow-hidden group"
+                                                                onClick={() => paymentInputRef.current?.click()}
+                                                            >
+                                                                {paymentPreview ? (
+                                                                    <>
+                                                                        <Image src={paymentPreview} alt="Payment Receipt" fill className="object-contain" />
+                                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                            <Button variant="secondary" size="sm">تغيير الصورة</Button>
                                                                         </div>
-                                                                    ))}
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-sm text-gray-500 italic p-3 bg-gray-50 rounded-[6.5px] border border-dashed">
-                                                                    لا توجد حسابات بنكية مضافة لهذا المعهد حاليًا. يمكنك التواصل مع المعهد مباشرة.
-                                                                </div>
-                                                            )}
-                                                        </div>
-
-                                                        <div
-                                                            className="relative h-48 w-full rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer overflow-hidden group"
-                                                            onClick={() => paymentInputRef.current?.click()}
-                                                        >
-                                                            {paymentPreview ? (
-                                                                <>
-                                                                    <Image src={paymentPreview} alt="Payment Receipt" fill className="object-contain" />
-                                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                                        <Button variant="secondary" size="sm">تغيير الصورة</Button>
+                                                                    </>
+                                                                ) : (
+                                                                    <div className="text-center p-6">
+                                                                        <div className="bg-blue-100 p-3 rounded-full w-fit mx-auto mb-3">
+                                                                            <Plus className="h-6 w-6 text-blue-600" />
+                                                                        </div>
+                                                                        <p className="font-medium text-gray-700">إرفاق صورة سند الدفع</p>
+                                                                        <p className="text-xs text-gray-500 mt-1">اضغط هنا لرفع الملف (JPG, PNG)</p>
                                                                     </div>
-                                                                </>
-                                                            ) : (
-                                                                <div className="text-center p-6">
-                                                                    <div className="bg-blue-100 p-3 rounded-full w-fit mx-auto mb-3">
-                                                                        <Plus className="h-6 w-6 text-blue-600" />
-                                                                    </div>
-                                                                    <p className="font-medium text-gray-700">إرفاق صورة سند الدفع</p>
-                                                                    <p className="text-xs text-gray-500 mt-1">اضغط هنا لرفع الملف (JPG, PNG)</p>
-                                                                </div>
-                                                            )}
-                                                            <input
-                                                                type="file"
-                                                                ref={paymentInputRef}
-                                                                className="hidden"
-                                                                accept="image/*"
-                                                                onChange={handlePaymentChange}
-                                                            />
-                                                        </div>
+                                                                )}
+                                                                <input
+                                                                    type="file"
+                                                                    ref={paymentInputRef}
+                                                                    className="hidden"
+                                                                    accept="image/*"
+                                                                    onChange={handlePaymentChange}
+                                                                />
+                                                            </div>
 
-                                                        <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
-                                                            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                                                            <p>
-                                                                سيتم مراجعة طلب حجز القاعة وتأكيده من قبل إدارة المعهد قبل تفعيل الدورة بشكل نهائي.
-                                                                تأكد من وضوح بيانات السند لتسريع عملية القبول.
-                                                            </p>
-                                                        </div>
+                                                            <div className="flex items-start gap-2 text-xs text-amber-600 bg-amber-50 p-3 rounded-lg border border-amber-100">
+                                                                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                                                                <p>
+                                                                    سيتم مراجعة طلب حجز القاعة وتأكيده من قبل إدارة المعهد قبل تفعيل الدورة بشكل نهائي.
+                                                                    تأكد من وضوح بيانات السند لتسريع عملية القبول.
+                                                                </p>
+                                                            </div>
                                                         </CardContent>
                                                     </Card>
                                                 )}
@@ -1858,19 +1855,20 @@ function CreateCoursePageInner() {
                                         </Button>
                                     )}
 
-                                    {/* زر نشر الدورة (draft → pending_minimum) */}
+                                    {/* زر نشر الدورة النهائي (draft → active) */}
                                     {permissions.showPublishCourse && (
                                         <Button
-                                            onClick={() => handleSubmit('PENDING_MINIMUM')}
-                                            disabled={!isInfoValid || isSubmitting}
+                                            onClick={() => handleSubmit('ACTIVE')}
+                                            disabled={!isInfoValid || !isLocationValid() || isSubmitting}
+                                            className="bg-blue-600 hover:bg-blue-700 text-white"
                                             id="btn-publish-course"
                                         >
                                             {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                            نشر الدورة
+                                            نشر وتفعيل الدورة
                                         </Button>
                                     )}
 
-                                    {/* زر حفظ التغييرات (pending_min_waiting / active) */}
+                                    {/* زر حفظ التغييرات */}
                                     {permissions.showSaveChanges && (
                                         <Button
                                             onClick={() => handleSubmit(courseStatus as any)}

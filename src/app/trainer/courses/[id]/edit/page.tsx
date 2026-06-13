@@ -174,9 +174,9 @@ export default function EditCoursePage() {
                 const filtered = prev.filter(t => t.id !== newTag.id && t.name !== newTag.name)
                 return [...filtered, newTag].sort((a, b) => a.name.localeCompare(b.name))
             })
-            setCourseData(prev => ({ 
-                ...prev, 
-                tags: prev.tags.includes(newTag.name) ? prev.tags : [...prev.tags, newTag.name] 
+            setCourseData(prev => ({
+                ...prev,
+                tags: prev.tags.includes(newTag.name) ? prev.tags : [...prev.tags, newTag.name]
             }))
             setNewTagInput("")
             toast.success(`تم إضافة الوسم "${newTag.name}" بنجاح`)
@@ -278,10 +278,10 @@ export default function EditCoursePage() {
                         const location = String(course.sessions[0]?.location || "").toLowerCase()
                         const platformValue =
                             location.includes("zoom") ? "zoom" :
-                            location.includes("meet") ? "meet" :
-                            location.includes("teams") ? "teams" :
-                            location.includes("webex") ? "webex" :
-                            location ? "other" : ""
+                                location.includes("meet") ? "meet" :
+                                    location.includes("teams") ? "teams" :
+                                        location.includes("webex") ? "webex" :
+                                            location ? "other" : ""
                         setOnlineSchedule({
                             platform: platformValue,
                             meetingLink: course.sessions[0]?.meetingLink || "",
@@ -1353,7 +1353,7 @@ export default function EditCoursePage() {
                                                         ${isSelected ? 'bg-blue-600 text-white' :
                                                                     d.isPast ? 'bg-gray-100 text-gray-300' :
                                                                         blackout ? 'bg-red-50 text-red-500 border-red-200 border hover:bg-red-100' :
-                                                                        hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
+                                                                            hasSessions ? 'bg-blue-100 text-blue-800 border-blue-200 border' : 'bg-white border hover:bg-gray-50'
                                                                 }`}
                                                         >
                                                             {d.day}
@@ -1419,11 +1419,10 @@ export default function EditCoursePage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setLabelingMode('individual')}
-                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                                                                    labelingMode === 'individual'
-                                                                        ? 'border-blue-600 bg-blue-600 text-white'
-                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                                                                }`}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${labelingMode === 'individual'
+                                                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                    }`}
                                                             >
                                                                 <CheckCircle className="h-4 w-4" />
                                                                 عنونة كل جلسة على حدة
@@ -1431,11 +1430,10 @@ export default function EditCoursePage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setLabelingMode('grouped')}
-                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
-                                                                    labelingMode === 'grouped'
-                                                                        ? 'border-blue-600 bg-blue-600 text-white'
-                                                                        : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                                                                }`}
+                                                                className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${labelingMode === 'grouped'
+                                                                    ? 'border-blue-600 bg-blue-600 text-white'
+                                                                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                                                                    }`}
                                                             >
                                                                 <ListChecks className="h-4 w-4" />
                                                                 عنونة مجموعة جلسات
@@ -1553,11 +1551,10 @@ export default function EditCoursePage() {
                                                                                             <Badge variant="secondary" className="rounded-[6.5px] bg-slate-100 text-slate-700 shadow-none text-xs">{s.slot}</Badge>
                                                                                         </td>
                                                                                         <td className="px-3 py-1.5">
-                                                                                            <span className={`text-xs font-medium ${
-                                                                                                getEffectiveTopic(idx + 1) === 'جلسة حضورية'
-                                                                                                    ? 'text-slate-400 italic'
-                                                                                                    : 'text-blue-700'
-                                                                                            }`}>
+                                                                                            <span className={`text-xs font-medium ${getEffectiveTopic(idx + 1) === 'جلسة حضورية'
+                                                                                                ? 'text-slate-400 italic'
+                                                                                                : 'text-blue-700'
+                                                                                                }`}>
                                                                                                 {getEffectiveTopic(idx + 1)}
                                                                                             </span>
                                                                                         </td>
@@ -1769,19 +1766,20 @@ export default function EditCoursePage() {
                                 </Button>
                             )}
 
-                            {/* زر نشر الدورة (draft → pending_minimum) */}
+                            {/* زر نشر الدورة النهائي (draft → active / pending_approval) */}
                             {permissions.showPublishCourse && (
                                 <Button
-                                    onClick={() => handleSubmit('PENDING_MINIMUM')}
-                                    disabled={!isInfoValid || isSubmitting}
+                                    onClick={() => handleSubmit('ACTIVE')}
+                                    disabled={!isInfoValid || !isLocationValid() || isSubmitting}
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
                                     id="btn-publish-course"
                                 >
                                     {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                                    نشر الدورة
+                                    {courseData.deliveryType === 'in_person' ? 'إرسال للمراجعة' : 'نشر وتفعيل الدورة'}
                                 </Button>
                             )}
 
-                            {/* زر حفظ التغييرات (pending_min_waiting / active) */}
+                            {/* زر حفظ التغييرات */}
                             {permissions.showSaveChanges && (
                                 <Button
                                     onClick={() => handleSubmit(courseStatus as any)}

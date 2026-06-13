@@ -667,7 +667,7 @@ class TrainerService {
             // Delete old sessions for this course first
             await prisma.session.deleteMany({ where: { courseId } });
 
-            if (data.hallId && data.paymentReceiptPath) {
+            if (data.hallId) {
                 try {
                     // In-person: create room booking + payment + sessions linked to booking
                     const room = await prisma.room.findUnique({ where: { id: data.hallId } });
@@ -698,7 +698,7 @@ class TrainerService {
                             selectedDays: [],
                             defaultStartTime: toTimeOnly(sortedSessions[0].startTime),
                             defaultEndTime: toTimeOnly(sortedSessions[0].endTime),
-                            status: 'PENDING_APPROVAL',
+                            status: data.paymentReceiptPath ? 'PENDING_APPROVAL' : 'PENDING_PAYMENT',
                             totalPrice: isNaN(totalPrice) ? 0 : totalPrice,
                             roomId: room.id,
                             requestedById: userId,
@@ -707,16 +707,18 @@ class TrainerService {
                         }
                     });
 
-                    await prisma.payment.create({
-                        data: {
-                            amount: isNaN(totalPrice) ? 0 : totalPrice,
-                            currency: 'YER',
-                            depositSlipImage: data.paymentReceiptPath,
-                            notes: `إيصال دفع لحجز قاعة (${room.name}) للدورة (${updated.title})`,
-                            status: 'PENDING_REVIEW',
-                            roomBookingId: roomBooking.id
-                        }
-                    });
+                    if (data.paymentReceiptPath) {
+                        await prisma.payment.create({
+                            data: {
+                                amount: isNaN(totalPrice) ? 0 : totalPrice,
+                                currency: 'YER',
+                                depositSlipImage: data.paymentReceiptPath,
+                                notes: `إيصال دفع لحجز قاعة (${room.name}) للدورة (${updated.title})`,
+                                status: 'PENDING_REVIEW',
+                                roomBookingId: roomBooking.id
+                            }
+                        });
+                    }
 
                     await prisma.session.createMany({
                         data: mappedSessions.map((s: any) => ({

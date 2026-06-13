@@ -1290,9 +1290,30 @@ class InstituteService {
                  return { ...slot, isUsed };
             });
 
+            const bookedDatesSet = new Set<string>();
+            hall.sessions.forEach(s => {
+                const d = s.startTime;
+                bookedDatesSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+            });
+            hall.bookings.forEach(b => {
+                if (b.bookingMode !== 'UNIFIED_TIME') return;
+                const cur = new Date(b.startDate.toISOString().substring(0, 10) + 'T00:00:00');
+                const end = new Date(b.endDate.toISOString().substring(0, 10) + 'T23:59:59');
+                while(cur <= end) {
+                    if (b.selectedDays.length > 0) {
+                         const dayMapRev: Record<number, string> = { 0: 'SUNDAY', 1: 'MONDAY', 2: 'TUESDAY', 3: 'WEDNESDAY', 4: 'THURSDAY', 5: 'FRIDAY', 6: 'SATURDAY' };
+                         if (b.selectedDays.includes(dayMapRev[cur.getDay()] as any)) {
+                             bookedDatesSet.add(`${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`);
+                         }
+                    }
+                    cur.setDate(cur.getDate() + 1);
+                }
+            });
+
             return {
                 ...hall,
                 availability: { ...avail, slots },
+                bookedDates: Array.from(bookedDatesSet),
                 institute: { name: institute.name },
                 bookings: undefined,
                 sessions: undefined
@@ -1354,7 +1375,7 @@ class InstituteService {
                 status: { not: 'CANCELLED' },
                 endDate: { gte: yesterday },
             },
-            select: { id: true, defaultStartTime: true, defaultEndTime: true, startDate: true, endDate: true }
+            select: { id: true, defaultStartTime: true, defaultEndTime: true, startDate: true, endDate: true, selectedDays: true, bookingMode: true }
         });
 
         const activeBookingIds = activeRoomBookings.map(rb => rb.id);
@@ -1382,9 +1403,21 @@ class InstituteService {
 
         const extraBlocked: { startTime: Date; endTime: Date }[] = [];
         for (const rb of activeRoomBookings.filter(rb => !sessionBookingIds.has(rb.id))) {
-            const cursor = new Date(rb.startDate);
-            const end = new Date(rb.endDate);
+            const startStr = rb.startDate.toISOString().substring(0, 10);
+            const cursor = new Date(startStr + 'T00:00:00');
+            const endStr = rb.endDate.toISOString().substring(0, 10);
+            const end = new Date(endStr + 'T23:59:59');
+            const dayMap: Record<string, number> = {
+                'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3, 'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
+            };
             while (cursor <= end) {
+                if (rb.bookingMode === 'UNIFIED_TIME' && rb.selectedDays && Array.isArray(rb.selectedDays) && rb.selectedDays.length > 0) {
+                    const selectedDaysNumbers = rb.selectedDays.map((d:string) => dayMap[d]);
+                    if (!selectedDaysNumbers.includes(cursor.getDay())) {
+                        cursor.setDate(cursor.getDate() + 1);
+                        continue;
+                    }
+                }
                 const dateStr = cursor.toISOString().substring(0, 10);
                 const sTime = rb.defaultStartTime.toISOString().substring(11, 16);
                 const eTime = rb.defaultEndTime.toISOString().substring(11, 16);
@@ -1460,18 +1493,30 @@ class InstituteService {
         });
         if (!room) throw new Error("لم يتم العثور على القاعة");
 
-        const oldAvailSlots = typeof room.availability === 'object' && room.availability ? (room.availability as any).slots || [] : [];
+        let oldAvailSlots: any[] = [];
+        if (Array.isArray(room.availability)) {
+            oldAvailSlots = room.availability;
+        } else if (typeof room.availability === 'object' && room.availability) {
+            oldAvailSlots = (room.availability as any).slots || [];
+        }
         let newAvailSlots: any[] = [];
+        let newBlackoutPeriods: any[] = [];
         if (typeof data.availability === 'string') {
-            try { newAvailSlots = JSON.parse(data.availability).slots || []; } catch {}
+            try { 
+                const parsed = JSON.parse(data.availability);
+                newAvailSlots = parsed.slots || []; 
+                newBlackoutPeriods = parsed.blackoutPeriods || [];
+            } catch {}
         } else {
             newAvailSlots = data.availability?.slots || [];
+            newBlackoutPeriods = data.availability?.blackoutPeriods || [];
         }
 
         console.log("Validation Debug - oldAvailSlots:", oldAvailSlots);
         console.log("Validation Debug - newAvailSlots:", newAvailSlots);
+        console.log("Validation Debug - newBlackoutPeriods:", newBlackoutPeriods);
 
-        if (newAvailSlots.length === 0) {
+        if (newAvailSlots.length === 0 && newBlackoutPeriods.length === 0) {
             return { affectedCourses: 0, affectedBookings: 0 };
         }
 
@@ -1484,7 +1529,7 @@ class InstituteService {
                 const oldEndMin = parseInt(oldSlot.endTime.split(':')[0]) * 60 + parseInt(oldSlot.endTime.split(':')[1]);
                 let covered = false;
                 for (const newSlot of newAvailSlots) {
-                    if (newSlot.day !== oldSlot.day) continue;
+                    if (newSlot.day?.toUpperCase() !== oldSlot.day?.toUpperCase()) continue;
                     const newStartMin = parseInt(newSlot.startTime.split(':')[0]) * 60 + parseInt(newSlot.startTime.split(':')[1]);
                     const newEndMin = parseInt(newSlot.endTime.split(':')[0]) * 60 + parseInt(newSlot.endTime.split(':')[1]);
                     if (newStartMin <= oldStartMin && newEndMin >= oldEndMin) {
@@ -1502,7 +1547,7 @@ class InstituteService {
 
         console.log("Validation Debug - isReduction:", isReduction);
 
-        if (!isReduction) {
+        if (!isReduction && newBlackoutPeriods.length === 0) {
             return { affectedCourses: 0, affectedBookings: 0 };
         }
 
@@ -1513,14 +1558,14 @@ class InstituteService {
             'SUNDAY': 0, 'MONDAY': 1, 'TUESDAY': 2, 'WEDNESDAY': 3, 'THURSDAY': 4, 'FRIDAY': 5, 'SATURDAY': 6
         };
 
-        const getASTDate = (d: Date) => new Date(d.getTime() + 3 * 60 * 60 * 1000);
-
-        const checkTimeFit = (astDay: number, astStart: Date, astEnd: Date) => {
-            const startMin = astStart.getUTCHours() * 60 + astStart.getUTCMinutes();
-            const endMin = astEnd.getUTCHours() * 60 + astEnd.getUTCMinutes();
+        const checkTimeFit = (sessionDay: number, sessionStart: Date, sessionEnd: Date) => {
+            if (newAvailSlots.length === 0) return true;
+            const startMin = sessionStart.getHours() * 60 + sessionStart.getMinutes();
+            const endMin = sessionEnd.getHours() * 60 + sessionEnd.getMinutes();
 
             for (const slot of newAvailSlots) {
-                if (dayMap[slot.day] !== astDay) continue;
+                const upperDay = slot.day?.toUpperCase() || '';
+                if (dayMap[upperDay] !== sessionDay) continue;
                 
                 const sSplit = slot.startTime.split(':');
                 const slotStart = parseInt(sSplit[0]) * 60 + parseInt(sSplit[1]);
@@ -1531,45 +1576,59 @@ class InstituteService {
                     return true;
                 }
             }
+            console.log(`Validation Debug - checkTimeFit FAILED for session: day=${sessionDay}, startMin=${startMin}, endMin=${endMin}, slots:`, JSON.stringify(newAvailSlots));
+            return false;
+        };
+
+        const isInBlackout = (checkStart: Date, checkEnd: Date) => {
+            for (const bp of newBlackoutPeriods) {
+                const bpStart = new Date(bp.startDate + 'T00:00:00');
+                const bpEnd = new Date(bp.endDate + 'T23:59:59');
+                if (checkStart <= bpEnd && checkEnd >= bpStart) {
+                    return true;
+                }
+            }
             return false;
         };
 
         for (const session of room.sessions) {
-            const astStart = getASTDate(session.startTime);
-            const astEnd = getASTDate(session.endTime);
-            const sessionDay = astStart.getUTCDay();
-            if (!checkTimeFit(sessionDay, astStart, astEnd)) {
+            const sessionDay = session.startTime.getDay();
+            if (!checkTimeFit(sessionDay, session.startTime, session.endTime) || isInBlackout(session.startTime, session.endTime)) {
                 if (session.courseId) affectedCourses.add(session.courseId);
                 if (session.roomBookingId) affectedBookings.add(session.roomBookingId);
             }
         }
 
         for (const booking of room.bookings) {
+            // CUSTOM_TIME bookings are validated through their individual sessions in the loop above.
+            if (booking.bookingMode === 'CUSTOM_TIME') continue;
+
             let fits = true;
-            const current = new Date(booking.startDate);
-            current.setUTCHours(0,0,0,0);
-            const end = new Date(booking.endDate);
-            end.setUTCHours(23,59,59,999);
+            const startStr = booking.startDate.toISOString().substring(0, 10);
+            const current = new Date(startStr + 'T00:00:00');
+            const endStr = booking.endDate.toISOString().substring(0, 10);
+            const end = new Date(endStr + 'T23:59:59');
 
             while (current <= end) {
-                const astCurrent = getASTDate(current);
-                const day = astCurrent.getUTCDay();
+                const day = current.getDay();
                 if (booking.bookingMode === 'UNIFIED_TIME' && booking.selectedDays.length > 0) {
                     const selectedDaysNumbers = booking.selectedDays.map((d:string) => dayMap[d]);
                     if (!selectedDaysNumbers.includes(day)) {
-                        current.setUTCDate(current.getUTCDate() + 1);
+                        current.setDate(current.getDate() + 1);
                         continue;
                     }
                 }
 
-                const astDefStart = getASTDate(booking.defaultStartTime);
-                const astDefEnd = getASTDate(booking.defaultEndTime);
+                const curStart = new Date(current);
+                curStart.setHours(booking.defaultStartTime.getHours(), booking.defaultStartTime.getMinutes());
+                const curEnd = new Date(current);
+                curEnd.setHours(booking.defaultEndTime.getHours(), booking.defaultEndTime.getMinutes());
 
-                if (!checkTimeFit(day, astDefStart, astDefEnd)) {
+                if (!checkTimeFit(day, curStart, curEnd) || isInBlackout(curStart, curEnd)) {
                     fits = false;
                     break;
                 }
-                current.setUTCDate(current.getUTCDate() + 1);
+                current.setDate(current.getDate() + 1);
             }
 
             if (!fits) {
@@ -2250,7 +2309,7 @@ class InstituteService {
             // Delete old sessions first
             await prisma.session.deleteMany({ where: { courseId } });
 
-            if (data.hallId && data.paymentReceiptPath) {
+            if (data.hallId) {
                 const room = await prisma.room.findUnique({ where: { id: data.hallId } });
                 if (!room) throw new Error('القاعة غير موجودة');
 
@@ -2267,7 +2326,7 @@ class InstituteService {
                         selectedDays: [],
                         defaultStartTime: sorted[0].startTime,
                         defaultEndTime: sorted[sorted.length - 1].endTime,
-                        status: 'PENDING_APPROVAL',
+                        status: 'APPROVED',
                         totalPrice,
                         roomId: room.id,
                         requestedById: userId,
@@ -2276,16 +2335,18 @@ class InstituteService {
                     }
                 });
 
-                await prisma.payment.create({
-                    data: {
-                        amount: totalPrice,
-                        currency: 'YER',
-                        depositSlipImage: data.paymentReceiptPath,
-                        notes: `إيصال دفع لحجز قاعة (${room.name})`,
-                        status: 'PENDING_REVIEW',
-                        roomBookingId: roomBooking.id
-                    }
-                });
+                if (data.paymentReceiptPath) {
+                    await prisma.payment.create({
+                        data: {
+                            amount: totalPrice,
+                            currency: 'YER',
+                            depositSlipImage: data.paymentReceiptPath,
+                            notes: `إيصال دفع لحجز قاعة (${room.name})`,
+                            status: 'APPROVED',
+                            roomBookingId: roomBooking.id
+                        }
+                    });
+                }
 
                 await prisma.session.createMany({
                     data: mappedSessions.map((s: any) => ({ ...s, roomBookingId: roomBooking.id, roomId: room.id }))

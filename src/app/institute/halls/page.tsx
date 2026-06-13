@@ -47,7 +47,7 @@ const ARABIC_DAYS = ["أح", "إث", "ثل", "أر", "خم", "جم", "سب"]
 const ARABIC_MONTHS = ["يناير","فبراير","مارس","أبريل","مايو","يونيو","يوليو","أغسطس","سبتمبر","أكتوبر","نوفمبر","ديسمبر"]
 
 function toDateStr(d: Date) {
-  return d.toISOString().substring(0, 10)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
 function isInBlackout(dateStr: string, periods: BlackoutPeriod[]) {
@@ -56,9 +56,11 @@ function isInBlackout(dateStr: string, periods: BlackoutPeriod[]) {
 
 function HallBlackoutCalendar({
   blackoutPeriods,
+  bookedDates = [],
   onChange,
 }: {
   blackoutPeriods: BlackoutPeriod[]
+  bookedDates?: string[]
   onChange: (periods: BlackoutPeriod[]) => void
 }) {
   const today = new Date()
@@ -69,6 +71,7 @@ function HallBlackoutCalendar({
   const [labelDialogOpen, setLabelDialogOpen] = useState(false)
   const [pendingRange, setPendingRange] = useState<{ start: string; end: string } | null>(null)
   const [labelInput, setLabelInput] = useState("")
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null)
 
   const firstDay = new Date(year, month, 1)
   const daysInMonth = new Date(year, month + 1, 0).getDate()
@@ -92,30 +95,86 @@ function HallBlackoutCalendar({
   }
 
   const handleDayClick = (d: string) => {
+    const existingPeriod = blackoutPeriods.find(p => d >= p.startDate && d <= p.endDate);
+    if (existingPeriod) {
+      setPendingRange({ start: existingPeriod.startDate, end: existingPeriod.endDate });
+      setLabelInput(existingPeriod.label);
+      setEditingPeriodId(existingPeriod.id);
+      setLabelDialogOpen(true);
+      return;
+    }
+
+    if (bookedDates.includes(d)) {
+      toast.error("هذا اليوم يحتوي على حجز مسبق، لا يمكن إضافته لفترة عدم الإتاحة");
+      return;
+    }
+
     if (!selStart) {
       setSelStart(d)
     } else {
       const start = selStart < d ? selStart : d
       const end = selStart < d ? d : selStart
+      
+      let hasBooked = false;
+      let curr = new Date(start + 'T12:00:00Z');
+      const endD = new Date(end + 'T12:00:00Z');
+      while (curr <= endD) {
+          const dateStr = curr.toISOString().substring(0, 10);
+          if (bookedDates.includes(dateStr)) {
+              hasBooked = true;
+              break;
+          }
+          curr.setUTCDate(curr.getUTCDate() + 1);
+      }
+
+      if (hasBooked) {
+          toast.error("الفترة المحددة تشمل أياماً محجوزة مسبقاً");
+          setSelStart(null)
+          setHovered(null)
+          return;
+      }
+
+      const overlaps = blackoutPeriods.some(p => start <= p.endDate && end >= p.startDate);
+      if (overlaps) {
+        setSelStart(null)
+        setHovered(null)
+        return;
+      }
       setSelStart(null)
       setHovered(null)
       setPendingRange({ start, end })
       setLabelInput("")
+      setEditingPeriodId(null)
       setLabelDialogOpen(true)
     }
   }
 
   const confirmAdd = () => {
     if (!pendingRange) return
-    const newP: BlackoutPeriod = {
-      id: `bp-${Date.now()}`,
-      label: labelInput.trim() || "فترة عدم الإتاحة",
-      startDate: pendingRange.start,
-      endDate: pendingRange.end,
+    let finalStart = pendingRange.start;
+    let finalEnd = pendingRange.end;
+    if (finalStart > finalEnd) {
+      const temp = finalStart;
+      finalStart = finalEnd;
+      finalEnd = temp;
     }
-    onChange([...blackoutPeriods, newP])
+
+    if (editingPeriodId) {
+      onChange(blackoutPeriods.map(p =>
+        p.id === editingPeriodId ? { ...p, label: labelInput.trim() || "فترة عدم الإتاحة", startDate: finalStart, endDate: finalEnd } : p
+      ))
+    } else {
+      const newP: BlackoutPeriod = {
+        id: `bp-${Date.now()}`,
+        label: labelInput.trim() || "فترة عدم الإتاحة",
+        startDate: finalStart,
+        endDate: finalEnd,
+      }
+      onChange([...blackoutPeriods, newP])
+    }
     setLabelDialogOpen(false)
     setPendingRange(null)
+    setEditingPeriodId(null)
   }
 
   const removeBlackout = (id: string) => {
@@ -155,20 +214,26 @@ function HallBlackoutCalendar({
           if (!d) return <div key={i} />
           const isBlackout = isInBlackout(d, blackoutPeriods)
           const inSel = isInSelection(d)
+          const isBooked = bookedDates.includes(d)
           return (
             <button
               key={d}
               onClick={() => handleDayClick(d)}
               onMouseEnter={() => selStart && setHovered(d)}
               onMouseLeave={() => setHovered(null)}
+              title={isBooked ? "يوجد حجز في هذا اليوم" : undefined}
               className={[
-                "h-8 w-full rounded text-xs font-medium transition-colors",
+                "h-8 w-full rounded text-xs font-medium transition-colors relative flex items-center justify-center",
                 isBlackout ? "bg-red-100 text-red-700 hover:bg-red-200" :
                 inSel ? "bg-blue-100 text-blue-700" :
-                "hover:bg-slate-100 text-slate-700"
+                "hover:bg-slate-100 text-slate-700",
+                isBooked && !isBlackout ? "ring-1 ring-amber-400 bg-amber-50" : ""
               ].join(" ")}
             >
-              {parseInt(d.substring(8))}
+              <span className="z-10 relative">{parseInt(d.substring(8))}</span>
+              {isBooked && (
+                <div className="absolute bottom-1 right-1 h-1.5 w-1.5 rounded-full bg-amber-500" />
+              )}
             </button>
           )
         })}
@@ -216,10 +281,35 @@ function HallBlackoutCalendar({
               onChange={e => setLabelInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && confirmAdd()}
             />
+            {editingPeriodId && pendingRange && (
+               <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div>
+                      <Label className="text-xs text-slate-500 mb-1 block">من تاريخ</Label>
+                      <Input 
+                          type="date" 
+                          value={pendingRange.start} 
+                          onChange={e => setPendingRange({...pendingRange, start: e.target.value})} 
+                      />
+                  </div>
+                  <div>
+                      <Label className="text-xs text-slate-500 mb-1 block">إلى تاريخ</Label>
+                      <Input 
+                          type="date" 
+                          value={pendingRange.end} 
+                          onChange={e => setPendingRange({...pendingRange, end: e.target.value})} 
+                      />
+                  </div>
+               </div>
+            )}
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => { setLabelDialogOpen(false); setPendingRange(null) }}>إلغاء</Button>
-            <Button onClick={confirmAdd}>إضافة الفترة</Button>
+            <Button variant="outline" onClick={() => { setLabelDialogOpen(false); setPendingRange(null); setEditingPeriodId(null); }}>إلغاء</Button>
+            {editingPeriodId && (
+               <Button variant="destructive" className="ml-auto" onClick={() => { removeBlackout(editingPeriodId); setLabelDialogOpen(false); setPendingRange(null); setEditingPeriodId(null); }}>
+                   حذف
+               </Button>
+            )}
+            <Button onClick={confirmAdd}>حفظ</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -269,6 +359,7 @@ export default function InstituteHallsPage() {
           image: room.image,
           features: room.facilities || [],
           availability,
+          bookedDates: room.bookedDates || []
         }
       })
       setHalls(mappedHalls)
@@ -1006,6 +1097,7 @@ export default function InstituteHallsPage() {
                       <p className="text-xs text-slate-400 -mt-2">حدد التواريخ التي تكون فيها القاعة غير متاحة (مثل الإجازات والمناسبات).</p>
                       <HallBlackoutCalendar
                         blackoutPeriods={editingForm.availability.blackoutPeriods}
+                        bookedDates={(editingForm as any).bookedDates}
                         onChange={(periods) =>
                           setEditingHall(prev => prev ? {
                             ...prev,
