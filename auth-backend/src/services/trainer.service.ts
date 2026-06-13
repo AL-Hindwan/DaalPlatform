@@ -739,8 +739,8 @@ class TrainerService {
                         await notificationService.createNotification({
                             userId: institute.user.id,
                             type: 'NEW_BOOKING_REQUEST',
-                            title: 'طلب حجز قاعة جديد (تعديل)',
-                            message: `طلب المدرب ${trainerUser.name} تحديث حجز قاعة "${room.name}" لدورة "${updated.title}"`,
+                            title: 'طلب حجز قاعة جديد',
+                            message: `طلب المدرب ${trainerUser.name} حجز قاعة "${room.name}" لدورة "${updated.title}"`,
                             relatedEntityId: roomBooking.id,
                             actionUrl: '/institute/room-bookings',
                             emailFn: institute.user.email ? () => mailerService.sendNewBookingRequest(institute.user.email!, institute.user.name, trainerUser.name, room.name) : undefined,

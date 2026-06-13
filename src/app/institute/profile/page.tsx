@@ -94,7 +94,7 @@ function Field({
 
 export default function InstituteProfilePage() {
   const { updateUser } = useAuth()
-  const [activeTab, setActiveTab] = useState("personal")
+  const [activeTab, setActiveTab] = useState("institute-data")
   const [isEditing, setIsEditing] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
@@ -144,8 +144,6 @@ export default function InstituteProfilePage() {
 
   const [newFeature, setNewFeature] = useState("")
 
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [savedInstituteLogo, setSavedInstituteLogo] = useState("")
   const [logoError, setLogoError] = useState("")
@@ -314,8 +312,8 @@ export default function InstituteProfilePage() {
       setLogoError("صيغة الصورة غير مدعومة")
       return
     }
-    if (file.size > 2 * 1024 * 1024) {
-      setLogoError("حجم الصورة يجب ألا يتجاوز 2MB")
+    if (file.size > 5 * 1024 * 1024) {
+      setLogoError("حجم الصورة يجب ألا يتجاوز 5MB")
       return
     }
 
@@ -323,19 +321,6 @@ export default function InstituteProfilePage() {
     setLogoFile(file)
     setUser((prev) => ({ ...prev, instituteLogo: URL.createObjectURL(file) }))
     setIsEditing(true)
-  }
-
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setAvatarFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-      setIsEditing(true)
-    }
   }
 
   const handlePasswordChange = async () => {
@@ -380,31 +365,33 @@ export default function InstituteProfilePage() {
     try {
       setIsSaving(true)
       const formData = new FormData()
-      formData.append("name", user.name)
-      formData.append("phone", user.phone)
-      formData.append("email", user.email)
-      formData.append("instituteName", user.instituteName)
-      formData.append("instituteAddress", user.instituteAddress)
+      formData.append("name", user.instituteName || "")
+      formData.append("phone", user.publicPhone || "")
+      formData.append("email", user.publicEmail || "")
+      formData.append("instituteName", user.instituteName || "")
+      formData.append("instituteAddress", user.instituteAddress || "")
       formData.append("instituteWebsite", user.instituteWebsite || "")
       formData.append("website", user.instituteWebsite || "")
       formData.append("instituteLocationUrl", user.instituteLocationUrl || "")
       formData.append("locationUrl", user.instituteLocationUrl || "")
-      formData.append("instituteDescription", user.instituteDescription)
-      formData.append("city", user.city)
-      formData.append("publicPhone", user.publicPhone)
-      formData.append("publicEmail", user.publicEmail)
-      formData.append("managerName", user.managerName)
-      formData.append("managerPhone", user.managerPhone)
-      formData.append("adminEmail", user.adminEmail)
-      formData.append("licenseNumber", user.licenseNumber)
-      formData.append("documentType", user.documentType)
-      formData.append("documentNumber", user.documentNumber)
-      formData.append("socialFacebook", user.socialFacebook)
-      formData.append("socialInstagram", user.socialInstagram)
-      formData.append("socialX", user.socialX)
-      formData.append("socialLinkedin", user.socialLinkedin)
-      if (avatarFile) formData.append("avatar", avatarFile)
-      if (logoFile) formData.append("logo", logoFile)
+      formData.append("instituteDescription", user.instituteDescription || "")
+      formData.append("city", user.city || "")
+      formData.append("publicPhone", user.publicPhone || "")
+      formData.append("publicEmail", user.publicEmail || "")
+      formData.append("managerName", user.managerName || "")
+      formData.append("managerPhone", user.managerPhone || "")
+      formData.append("adminEmail", user.adminEmail || "")
+      formData.append("licenseNumber", user.licenseNumber || "")
+      formData.append("documentType", user.documentType || "")
+      formData.append("documentNumber", user.documentNumber || "")
+      formData.append("socialFacebook", user.socialFacebook || "")
+      formData.append("socialInstagram", user.socialInstagram || "")
+      formData.append("socialX", user.socialX || "")
+      formData.append("socialLinkedin", user.socialLinkedin || "")
+      if (logoFile) {
+        formData.append("avatar", logoFile)
+        formData.append("logo", logoFile)
+      }
       if (docFiles.licenseDocument) formData.append("licenseDocument", docFiles.licenseDocument)
       
       const finalFeatures = newFeature.trim() ? [...user.features, newFeature.trim()] : user.features
@@ -430,7 +417,6 @@ export default function InstituteProfilePage() {
       setIsEditing(false)
       setDocFiles({})
       setLogoFile(null)
-      setAvatarFile(null)
       setLogoError("")
     } catch {
       toast.error("حدث خطأ أثناء حفظ البيانات")
@@ -446,8 +432,6 @@ export default function InstituteProfilePage() {
   const handleCancelEdit = () => {
     setIsEditing(false)
     setLogoFile(null)
-    setAvatarFile(null)
-    setAvatarPreview(null)
     setDocFiles({})
     setLogoError("")
     setUser((prev) => ({ ...prev, instituteLogo: savedInstituteLogo }))
@@ -471,60 +455,10 @@ export default function InstituteProfilePage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl" className="space-y-4">
           <TabsList className="flex flex-wrap h-auto w-full rounded-[6.5px] bg-slate-100 p-1 justify-start overflow-x-auto">
-            <TabsTrigger value="personal" className="flex-1 min-w-[150px] rounded-[6.5px]">المعلومات الشخصية</TabsTrigger>
-            <TabsTrigger value="institute-data" className="flex-1 min-w-[150px] rounded-[6.5px]">بيانات المعهد</TabsTrigger>
+            <TabsTrigger value="institute-data" className="flex-1 min-w-[150px] rounded-[6.5px]">معلومات المعهد</TabsTrigger>
             <TabsTrigger value="banks" className="flex-1 min-w-[150px] rounded-[6.5px]">الحسابات البنكية</TabsTrigger>
             <TabsTrigger value="security" className="flex-1 min-w-[150px] rounded-[6.5px]">الأمان وكلمة المرور</TabsTrigger>
           </TabsList>
-
-          <TabsContent value="personal" className="mt-0 space-y-4">
-            <Card className="rounded-[6.5px] border border-slate-200 bg-white shadow-sm">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Badge className="rounded-[6.5px] bg-slate-200 text-slate-700 hover:bg-slate-200">لا تظهر للطلاب</Badge>
-                  <CardTitle className="text-right">المعلومات الشخصية (مدير الحساب)</CardTitle>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div className="mb-6 flex flex-col items-center gap-4 sm:flex-row sm:justify-start">
-                  <div className="relative">
-                    <Avatar className="h-20 w-20 border-2 border-white shadow-md">
-                      <AvatarImage src={avatarPreview || getFileUrl(user.avatar)} />
-                      <AvatarFallback className="bg-blue-50 text-xl font-bold text-blue-700">
-                        {user.name?.charAt(0) || "؟"}
-                      </AvatarFallback>
-                    </Avatar>
-                    {isEditing && (
-                      <Label htmlFor="avatar-upload" className="absolute bottom-0 right-0 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-blue-600 text-white shadow-sm transition-colors hover:bg-blue-700">
-                        <Camera className="h-3 w-3" />
-                      </Label>
-                    )}
-                    <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={!isEditing} />
-                  </div>
-                  <div className="text-right">
-                    <h3 className="font-semibold text-slate-900">صورة مدير الحساب</h3>
-                    <p className="text-sm text-slate-500">اختر صورة شخصية تظهر لك فقط</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <Field label="اسم مدير الحساب" icon={<User className="h-4 w-4" />} value={user.name} editable={isEditing} onChange={(v) => setUser((p) => ({ ...p, name: v }))} placeholder="أدخل اسم مدير الحساب" />
-                  <Field label="البريد الإلكتروني للإدارة" icon={<Mail className="h-4 w-4" />} value={user.email} editable={isEditing} onChange={(v) => setUser((p) => ({ ...p, email: v }))} placeholder="أدخل البريد الإلكتروني الخاص بتسجيل الدخول" />
-                  <Field label="رقم التواصل للإدارة" icon={<Phone className="h-4 w-4" />} value={user.phone} editable={isEditing} onChange={(v) => setUser((p) => ({ ...p, phone: v }))} placeholder="أدخل رقم التواصل الخاص بالإدارة" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:justify-start">
-              {isEditing ? (
-                <>
-                  <Button onClick={handleSave} disabled={isSaving} className="h-10 rounded-[6.5px] bg-blue-600 hover:bg-blue-700">{isSaving ? "جاري الحفظ..." : "حفظ التغييرات"}</Button>
-                  <Button variant="outline" onClick={handleCancelEdit} disabled={isSaving} className="h-10 rounded-[6.5px]">إلغاء</Button>
-                </>
-              ) : (
-                <Button onClick={() => setIsEditing(true)} className="h-10 rounded-[6.5px] bg-blue-600 hover:bg-blue-700">تعديل البيانات</Button>
-              )}
-            </div>
-          </TabsContent>
 
           <TabsContent value="institute-data" className="mt-0 space-y-4">
             <Card className="rounded-[6.5px] border border-slate-200 bg-white shadow-sm">
@@ -560,9 +494,6 @@ export default function InstituteProfilePage() {
                   </div>
                   <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                     <Button onClick={() => setIsEditing(true)} className="h-10 rounded-[6.5px] bg-blue-600 hover:bg-blue-700">تعديل البيانات</Button>
-                    <Button asChild variant="outline" className="h-10 rounded-[6.5px] border-slate-200">
-                      <Link href={user.id ? `/institutes/${user.id}` : "/institutes"}>معاينة صفحة المعهد</Link>
-                    </Button>
                   </div>
                 </div>
               </CardContent>

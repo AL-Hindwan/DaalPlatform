@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -371,7 +371,7 @@ export default function InstituteStaff() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="order-2 sm:order-1 flex-1">
                   <Label className="text-[14px] font-semibold text-[#0F172A]">صورة المدرب</Label>
-                  <p className="mt-1 text-xs text-[#94A3B8]">اختياري، PNG أو JPG حتى 2MB</p>
+                  <p className="mt-1 text-xs text-[#94A3B8]">اختياري، PNG أو JPG حتى 5MB</p>
                   <input
                     id="add-avatar-upload"
                     type="file"

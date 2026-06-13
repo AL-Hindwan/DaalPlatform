@@ -79,6 +79,8 @@ export class AuthService {
                 data: {
                     userId: user.id,
                     name: name, // Use user name as institute name initially
+                    email: email,
+                    phone: phone,
                     licenseDocumentUrl,
                     verificationStatus: 'PENDING',
                 },
