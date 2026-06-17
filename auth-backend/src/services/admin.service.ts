@@ -1002,8 +1002,21 @@ export class AdminService {
         const course = await prisma.course.findUnique({ where: { id: courseId } });
         if (!course) throw new Error('الدورة غير موجودة');
 
-        await prisma.course.delete({
-            where: { id: courseId },
+        await prisma.$transaction(async (tx) => {
+            await tx.session.updateMany({
+                where: { courseId, status: { in: ['SCHEDULED', 'POSTPONED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            await tx.roomBooking.updateMany({
+                where: { courseId, status: { in: ['PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            await tx.course.update({
+                where: { id: courseId },
+                data: { deletedAt: new Date() },
+            });
         });
 
         // Log action

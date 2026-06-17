@@ -866,10 +866,24 @@ class TrainerService {
             performedBy: userId
         }).catch(e => console.error(e));
 
-        return prisma.course.update({
-            where: { id: courseId },
-            data: { deletedAt: new Date() },
+        const updatedCourse = await prisma.$transaction(async (tx) => {
+            await tx.session.updateMany({
+                where: { courseId, status: { in: ['SCHEDULED', 'POSTPONED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            await tx.roomBooking.updateMany({
+                where: { courseId, status: { in: ['PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            return tx.course.update({
+                where: { id: courseId },
+                data: { deletedAt: new Date() },
+            });
         });
+
+        return updatedCourse;
     }
 
     /**

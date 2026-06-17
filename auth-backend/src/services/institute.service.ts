@@ -930,9 +930,21 @@ class InstituteService {
             throw new Error('لا يمكن حذف دورة بها طلاب مستمرون أو قيد الانتظار. يرجى إلغاء الدورة أو إلغاء تسجيل الطلاب أولاً.');
         }
 
-        await prisma.course.update({
-            where: { id: courseId },
-            data: { deletedAt: new Date() },
+        await prisma.$transaction(async (tx) => {
+            await tx.session.updateMany({
+                where: { courseId, status: { in: ['SCHEDULED', 'POSTPONED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            await tx.roomBooking.updateMany({
+                where: { courseId, status: { in: ['PENDING_PAYMENT', 'PENDING_APPROVAL', 'APPROVED'] } },
+                data: { status: 'CANCELLED' }
+            });
+
+            await tx.course.update({
+                where: { id: courseId },
+                data: { deletedAt: new Date() },
+            });
         });
 
 
